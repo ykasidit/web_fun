@@ -8,3 +8,7 @@ Four small in-browser tools, deployed under www.clearevo.com/{doctor,calc,isearc
 - **/hex** - ClearEvo hex viewer/editor: edit bytes, search hex/text/**bit sequences at any bit offset** (bless-style), save edited file
 
 All 100% client-side. `./test.sh` runs the engine tests; `./push.sh` deploys the whole site.
+
+## License
+
+GPL v2, like the [Bluetooth GNSS](https://github.com/ykasidit/bluetooth_gnss) app - see [LICENSE](LICENSE).
