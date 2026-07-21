@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>almost Emacs isearch - incremental text search in your browser (C-s / C-r)</title>
+<meta name="description" content="Paste or open a text file and search it Emacs-style: C-s incremental search forward, C-r backward, smart case folding, wrap-around with authentic Failing/Wrapped/Overwrapped messages, match counts, easy copy out. 100% client-side.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔍</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/isearch/">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#fff}
+.menubar{background:#d6d0c8;border-bottom:1px solid #888;padding:2px 4px;font-size:12px;user-select:none;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.menubar button{font:inherit;font-size:12px;cursor:pointer}
+#view,#paste{flex:1;overflow:auto;padding:6px 8px;font-size:13px;white-space:pre-wrap;word-break:break-word;margin:0;border:none;outline:none;font-family:inherit}
+mark{background:#cfffc0}
+mark.cur{background:#ff9632}
+.modeline{background:#000;color:#fff;font-size:12px;padding:1px 8px;user-select:none}
+#echo{font-size:14px;padding:3px 8px;min-height:1.3em}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="menubar">
+    <button id="bOpen">Open file...</button>
+    <button id="bUse" hidden>Use pasted text (C-c C-c)</button>
+    <button id="bEdit">Edit/paste text</button>
+    <button id="bFwd" title="C-s">Search ▼ (C-s)</button>
+    <button id="bBack" title="C-r">Search ▲ (C-r)</button>
+    <button id="bCopy" title="M-w after C-x h">Copy all</button>
+    <span style="font-size:11px;margin-left:auto">an 'almost' Emacs isearch - smart case, wraps around - <a href="https://www.clearevo.com/">clearevo</a></span>
+  </div>
+  <textarea id="paste" placeholder="Paste your text here, then press C-c C-c (or the button) and search it with C-s / C-r ..."></textarea>
+  <div id="view" tabindex="0" hidden></div>
+  <div class="modeline" id="modeline">-UU-:----F1  *isearch-scratch*      All L1     (Text) -- C-s search forward, C-r backward, RET done, C-g cancel</div>
+  <div id="echo"></div>
+</div>
+<script type="module">
+import { createSearch, findAll, extend, repeat, echoLine, countLabel } from './logic.js';
+const $ = (id) => document.getElementById(id);
+const view = $('view'), paste = $('paste'), echo = $('echo');
+let text = '', s = createSearch(), matches = [];
+let bufName = '*isearch-scratch*';
+
+function esc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+function renderView() {
+  if (!s.active || !matches.length || !s.query) { view.innerHTML = esc(text); return; }
+  let html = '', prev = 0;
+  matches.forEach((m, i) => {
+    html += esc(text.slice(prev, m));
+    html += `<mark${i === s.curIdx ? ' class="cur" id="curmatch"' : ''}>${esc(text.slice(m, m + s.query.length))}</mark>`;
+    prev = m + s.query.length;
+  });
+  view.innerHTML = html + esc(text.slice(prev));
+  document.getElementById('curmatch')?.scrollIntoView({ block: 'center' });
+}
+function drawEcho(msg) {
+  echo.textContent = msg ?? echoLine(s);
+  $('modeline').textContent = `-UU-:----F1  ${bufName}  ${countLabel(s, matches)}    (Text) -- C-s forward, C-r backward, RET done, C-g cancel`;
+}
+function useText(t, name) {
+  text = t;
+  bufName = name || '*isearch-scratch*';
+  paste.hidden = true; $('bUse').hidden = true; view.hidden = false;
+  s = createSearch(); matches = [];
+  renderView(); drawEcho(''); view.focus();
+}
+function search(dir) {
+  if (!view.hidden === false) return;
+  if (!s.active) { s = createSearch(); s.dir = dir; s.active = true; matches = findAll(text, s.query); }
+  else if (s.query) repeat(s, matches, dir);
+  else s.dir = dir;
+  renderView(); drawEcho();
+}
+document.addEventListener('keydown', (e) => {
+  if (!paste.hidden && e.ctrlKey && e.key === 'c') { e.preventDefault(); useText(paste.value); return; }
+  if (view.hidden) return;
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); search(1); return; }
+  if (e.ctrlKey && e.key === 'r') { e.preventDefault(); search(-1); return; }
+  if (!s.active) return;
+  if (e.ctrlKey && e.key === 'g') { e.preventDefault(); s = createSearch(); matches = []; renderView(); drawEcho('Quit'); return; }
+  if (e.key === 'Enter' || e.key === 'Escape') { s.active = false; drawEcho('Mark saved where search started'); return; }
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    matches = extend(s, text, s.query.slice(0, -1));
+    renderView(); drawEcho(); return;
+  }
+  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    matches = extend(s, text, s.query + e.key);
+    renderView(); drawEcho();
+  }
+});
+$('bFwd').onclick = () => { view.focus(); search(1); };
+$('bBack').onclick = () => { view.focus(); search(-1); };
+$('bCopy').onclick = () => navigator.clipboard.writeText(text);
+$('bEdit').onclick = () => { paste.value = text; paste.hidden = false; $('bUse').hidden = false; view.hidden = true; paste.focus(); };
+$('bUse').onclick = () => useText(paste.value);
+$('bOpen').onclick = () => {
+  const i = document.createElement('input');
+  i.type = 'file';
+  i.onchange = async () => { if (i.files[0]) useText(await i.files[0].text(), i.files[0].name); };
+  i.click();
+};
+paste.addEventListener('input', () => { $('bUse').hidden = false; });
+drawEcho('');
+</script>
+</body>
+</html>

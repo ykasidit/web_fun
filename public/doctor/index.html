@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>almost Emacs doctor - the classic ELIZA psychotherapist in your browser</title>
+<meta name="description" content="An affectionate browser imitation of M-x doctor, the Emacs ELIZA psychotherapist. Type your problems, get gloriously unhelpful Rogerian questions back. 100% client-side.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩺</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/doctor/">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#fff}
+.menubar{background:#d6d0c8;border-bottom:1px solid #888;padding:2px 4px;font-size:13px;user-select:none}
+.menubar button{font:inherit;border:none;background:none;padding:1px 7px;cursor:pointer}
+.menubar button:hover{background:#316ac5;color:#fff}
+#buf{flex:1;overflow-y:auto;padding:6px 8px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+#buf .me{color:#1565c0}
+.modeline{background:#000;color:#fff;font-size:12px;padding:1px 8px;user-select:none}
+.mini{display:flex;border-top:1px solid #888;font-size:14px}
+.mini .prompt{padding:3px 2px 3px 8px;color:#666}
+.mini input{flex:1;border:none;outline:none;font:inherit;padding:3px}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="menubar">
+    <button id="mSend" title="or press RET">Send</button>
+    <button id="mRestart" title="M-x doctor">Restart (M-x doctor)</button>
+    <button id="mCopy">Copy transcript</button>
+    <span style="float:right;font-size:11px;padding:3px">an 'almost' <a href="https://www.gnu.org/software/emacs/">Emacs</a> M-x doctor - <a href="https://www.clearevo.com/">clearevo</a></span>
+  </div>
+  <div id="buf"></div>
+  <div class="modeline">-UU-:----F1  *doctor*      All L1     (Doctor Fill)  -- RET to send - this is a parody, not therapy or medical anything</div>
+  <div class="mini"><span class="prompt">&gt;</span><input id="inp" autocomplete="off" autofocus></div>
+</div>
+<script type="module">
+import { createDoctor, doctorReply, GREETING } from './logic.js';
+const buf = document.getElementById('buf'), inp = document.getElementById('inp');
+let state = createDoctor();
+function say(text, cls) {
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = text;
+  buf.appendChild(d);
+  buf.appendChild(document.createTextNode('\n'));
+  buf.scrollTop = buf.scrollHeight;
+}
+function restart() { buf.textContent = ''; state = createDoctor(); say(GREETING); inp.focus(); }
+// authentic doctor.el mechanic: lines accumulate in the buffer, RET on an
+// empty line (i.e. RET twice in a row) submits the whole paragraph
+let pending = [];
+function send() {
+  const t = [...pending, inp.value.trim()].filter(Boolean).join(' ');
+  if (inp.value.trim()) say(inp.value.trim(), 'me');
+  pending = [];
+  inp.value = '';
+  if (t) say('\n' + doctorReply(t, state) + '\n');
+}
+inp.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const line = inp.value.trim();
+    if (line === '') { send(); return; }        // second RET -> submit
+    pending.push(line);                          // first RET -> new line in buffer
+    say(line, 'me');
+    inp.value = '';
+  }
+  if (e.key === 'g' && e.ctrlKey) { e.preventDefault(); inp.value = ''; pending = []; }
+});
+// M-x doctor to restart, like a true believer
+let mx = false;
+document.addEventListener('keydown', (e) => {
+  if (e.altKey && e.key === 'x') { mx = true; e.preventDefault(); return; }
+  if (mx && e.key === 'Enter') { mx = false; restart(); }
+});
+document.getElementById('mSend').onclick = send;
+document.getElementById('mRestart').onclick = restart;
+document.getElementById('mCopy').onclick = () => navigator.clipboard.writeText(buf.textContent);
+restart();
+</script>
+</body>
+</html>

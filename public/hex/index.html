@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearEvo Hex Viewer/Editor online - search hex, text and bit sequences in your browser</title>
+<meta name="description" content="Free online hex viewer and editor: open any file, edit bytes in place, search by hex sequence, text, or a BIT sequence at any bit offset (bless-style, across octet boundaries), and save the edited file. 100% client-side - the file never leaves your machine.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔢</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/hex/">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e}
+.toolbar{background:#333;border-bottom:1px solid #555;padding:4px;font-size:12px;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.toolbar button,.toolbar select,.toolbar input{font:inherit;font-size:12px;background:#444;color:#eee;border:1px solid #666;padding:2px 7px}
+.toolbar button:hover{background:#555;cursor:pointer}
+#findText{width:220px}
+#grid{flex:1;overflow-y:auto;font-size:13px;line-height:1.35;padding:4px 8px;white-space:pre}
+#grid .off{color:#7aa2f7}
+#grid .hx{cursor:pointer}
+#grid .hx.sel{background:#ff9632;color:#000}
+#grid .hx.mod{color:#ff6b6b;font-weight:bold}
+#grid .hx.hit{background:#2e5c2e}
+#grid .as{color:#aaa}
+#grid .as.sel{background:#ff9632;color:#000}
+.statusbar{background:#333;border-top:1px solid #555;font-size:12px;padding:3px 8px;display:flex;gap:18px}
+.statusbar .warn{color:#ffb86c}
+a{color:#7aa2f7}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="toolbar">
+    <button id="bOpen">📂 Open file</button>
+    <button id="bSave" disabled>💾 Save edited</button>
+    <span>|</span>
+    <select id="findMode">
+      <option value="hex">Hex seq</option>
+      <option value="text">Text</option>
+      <option value="bits">Bit seq (any bit offset)</option>
+    </select>
+    <input id="findText" placeholder="DE AD BE EF   /   hello   /   101100111">
+    <button id="bFind">Find next (Enter / C-s)</button>
+    <span>|</span>
+    <input id="goto" placeholder="goto offset (hex)" style="width:110px">
+    <span style="margin-left:auto;font-size:11px">ClearEvo Hex - 100% in-browser, file never uploaded - <a href="https://www.clearevo.com/">clearevo</a></span>
+  </div>
+  <div id="grid" tabindex="0">
+open a file to begin -
+click a byte then type hex digits to overwrite it, arrows to move,
+search supports hex sequences, text, and bless-style BIT sequences that
+can match at any bit offset (not just octet-aligned)</div>
+  <div class="statusbar">
+    <span id="stName">no file</span>
+    <span id="stOff">offset: -</span>
+    <span id="stSel">-</span>
+    <span id="stMod" class="warn"></span>
+    <span id="stMsg"></span>
+  </div>
+</div>
+<script type="module">
+import { parseHexBytes, parseBitString, searchBytes, searchBits, toHex, rowData, offsetHex, createEdit, setByte } from './logic.js';
+const $ = (id) => document.getElementById(id);
+const grid = $('grid');
+const WIDTH = 16, PAGE_ROWS = 512; // ponytail: windowed paging, virtual scroll if huge files lag
+let ed = null, fileName = 'file.bin', sel = -1, nibble = 0, page = 0, hit = { start: -1, len: 0, bit: -1 };
+
+function msg(t) { $('stMsg').textContent = t; }
+function render() {
+  if (!ed) return;
+  const total = ed.bytes.length;
+  const start = page * PAGE_ROWS * WIDTH;
+  const end = Math.min(total, start + PAGE_ROWS * WIDTH);
+  const parts = [];
+  for (let r = start; r < end; r += WIDTH) {
+    const row = rowData(ed.bytes, r, WIDTH);
+    let line = `<span class="off">${row.off}</span>  `;
+    row.hex.forEach((h, i) => {
+      const o = r + i;
+      const cls = ['hx', o === sel ? 'sel' : '', ed.modified.has(o) ? 'mod' : '',
+        hit.start >= 0 && o >= hit.start && o < hit.start + hit.len ? 'hit' : ''].join(' ').trim();
+      line += `<span class="${cls}" data-o="${o}">${h}</span>${i === 7 ? '  ' : ' '}`;
+    });
+    line += '   '.repeat(WIDTH - row.hex.length) + (row.hex.length <= 8 ? '  ' : '');
+    line += ` <span class="as${sel >= r && sel < r + WIDTH ? '' : ''}">${row.ascii.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`;
+    parts.push(line);
+  }
+  const pages = Math.ceil(total / (PAGE_ROWS * WIDTH));
+  if (pages > 1) parts.push(`\n-- page ${page + 1}/${pages} - PgUp/PgDn --`);
+  grid.innerHTML = parts.join('\n');
+  $('stOff').textContent = sel >= 0 ? `offset: 0x${offsetHex(sel)} (${sel})` : 'offset: -';
+  $('stSel').textContent = sel >= 0 ? `byte: 0x${toHex(ed.bytes[sel])} ${ed.bytes[sel]}` : '-';
+  $('stMod').textContent = ed.modified.size ? `${ed.modified.size} byte(s) modified` : '';
+  $('bSave').disabled = !ed;
+  grid.querySelector('.hx.sel')?.scrollIntoView({ block: 'nearest' });
+}
+function select(o) {
+  if (!ed || o < 0 || o >= ed.bytes.length) return;
+  sel = o; nibble = 0;
+  const p = Math.floor(o / (PAGE_ROWS * WIDTH));
+  if (p !== page) page = p;
+  render();
+}
+$('bOpen').onclick = () => {
+  const i = document.createElement('input');
+  i.type = 'file';
+  i.onchange = async () => {
+    const f = i.files[0];
+    if (!f) return;
+    ed = createEdit(new Uint8Array(await f.arrayBuffer()));
+    fileName = f.name; sel = -1; page = 0; hit = { start: -1, len: 0, bit: -1 };
+    $('stName').textContent = `${f.name} (${ed.bytes.length} bytes)`;
+    msg(''); render(); grid.focus();
+  };
+  i.click();
+};
+$('bSave').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([ed.bytes]));
+  a.download = fileName.replace(/(\.[^.]*)?$/, '_edited$1');
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+function doFind() {
+  if (!ed) return;
+  const q = $('findText').value.trim();
+  const mode = $('findMode').value;
+  const from = (hit.start >= 0 ? hit.start + 1 : (sel >= 0 ? sel : 0));
+  if (mode === 'bits') {
+    const bits = parseBitString(q);
+    if (!bits) { msg('bad bit string (use 0/1)'); return; }
+    const r = searchBits(ed.bytes, bits, from);
+    if (!r) { msg('bit pattern not found'); hit = { start: -1, len: 0, bit: -1 }; render(); return; }
+    hit = { start: r.byte, len: Math.ceil((r.bit + bits.length) / 8), bit: r.bit };
+    msg(`bit match at 0x${offsetHex(r.byte)} + ${r.bit} bits`);
+    select(r.byte);
+  } else {
+    const needle = mode === 'hex' ? parseHexBytes(q) : new TextEncoder().encode(q);
+    if (!needle || !needle.length) { msg(mode === 'hex' ? 'bad hex (pairs of 0-9A-F)' : 'empty search'); return; }
+    const r = searchBytes(ed.bytes, needle, from);
+    if (r === -1) { msg('not found'); hit = { start: -1, len: 0, bit: -1 }; render(); return; }
+    hit = { start: r, len: needle.length, bit: -1 };
+    msg(`match at 0x${offsetHex(r)}${r < from ? ' (wrapped)' : ''}`);
+    select(r);
+  }
+}
+$('bFind').onclick = doFind;
+$('findText').addEventListener('keydown', (e) => { if (e.key === 'Enter') doFind(); });
+$('goto').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { const o = parseInt($('goto').value, 16); if (!isNaN(o)) { select(Math.min(o, ed ? ed.bytes.length - 1 : 0)); grid.focus(); } }
+});
+grid.addEventListener('click', (e) => {
+  const b = e.target.closest('.hx');
+  if (b) { select(+b.dataset.o); grid.focus(); }
+});
+grid.addEventListener('keydown', (e) => {
+  if (!ed || sel < 0) {
+    if (e.ctrlKey && e.key === 's') { e.preventDefault(); doFind(); }
+    return;
+  }
+  const mv = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: WIDTH, ArrowUp: -WIDTH, PageDown: PAGE_ROWS * WIDTH, PageUp: -PAGE_ROWS * WIDTH }[e.key];
+  if (mv) { e.preventDefault(); select(Math.max(0, Math.min(ed.bytes.length - 1, sel + mv))); return; }
+  if (e.ctrlKey && e.key === 's') { e.preventDefault(); doFind(); return; }
+  if (/^[0-9a-fA-F]$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    const v = parseInt(e.key, 16);
+    const cur = ed.bytes[sel];
+    const nv = nibble === 0 ? (v << 4) | (cur & 0x0f) : (cur & 0xf0) | v;
+    setByte(ed, sel, nv);
+    if (nibble === 0) { nibble = 1; render(); }
+    else { nibble = 0; select(Math.min(ed.bytes.length - 1, sel + 1)); }
+  }
+});
+</script>
+</body>
+</html>
