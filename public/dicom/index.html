@@ -631,6 +631,14 @@ if (location.hash.startsWith('#load=')) {
   const u = location.hash.slice(6);
   openUrl(u, u.split('/').pop()).catch((e) => stat('load failed: ' + e.message));
 }
+// dev screenshot hook: #cap=<url>||<seriesIdx>||<sliceIdx> - load, pick series, show slice
+if (location.hash.startsWith('#cap=')) {
+  const [u, si, ii] = decodeURIComponent(location.hash.slice(5)).split('||');
+  openUrl(u, u.split('/').pop())
+    .then(() => { if (series[+si]) selectSeries(series[+si]); return show(+ii); })
+    .then(() => { $('srcbadge').style.display = 'none'; })
+    .catch((e) => stat('cap failed: ' + e.message));
+}
 </script>
 <script>/* zoom persisted per tool family */
 (function(){var z=+localStorage.getItem('ce_zoom')||100;
