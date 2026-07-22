@@ -1,6 +1,6 @@
 # clearevo fun tools
 
-Seven small in-browser tools, one directory each under `public/`, deployed under www.clearevo.com/{doctor,calc,isearch,hex,geo,qr,audio}:
+Seven small in-browser tools, one directory each under `public/`, deployed on [www.clearevo.com](https://www.clearevo.com/tools/) - live link on each tool below:
 
 - **[/doctor](public/doctor)** - 'almost' Emacs `M-x doctor` (ELIZA psychotherapist, RET-twice submit) - [live](https://www.clearevo.com/doctor/)
 - **[/calc](public/calc)** - 'almost' Emacs `M-x calc` (RPN stack, *Calc Trail* pane, RET dup / TAB swap / n / & / Q / U undo) - [live](https://www.clearevo.com/calc/)
