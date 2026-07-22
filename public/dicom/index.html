@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DICOM Viewer online - open a CT/MRI CD (zip) in your browser, no upload, works on phones</title>
-<meta name="description" content="Free online DICOM viewer: open the zipped CD from your CT or MRI scan and browse it right in your browser - series list, slice scrolling, window/level, zoom - on desktop and phones. 100% client-side: your medical images are never uploaded anywhere.">
+<title>Online MRI/CT CD Viewer - open your DICOM scan CD in the browser, no upload | ClearEvo</title>
+<meta name="description" content="Free online MRI/CT CD viewer: open or stream the DICOM CD from your MRI or CT scan right in your browser, on PC and phone - series list, slice scrolling, window/level, measure, tags. 100% client-side, your medical images are never uploaded. A DICOM viewer with no install and no sign-up.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩻</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/dicom/">
 <link rel="manifest" href="manifest.json">
@@ -49,7 +49,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
 </head>
 <body>
 <div class="window" id="app">
-  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 DICOM Viewer - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 Online MRI/CT CD Viewer - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
   <div class="window-body">
   <div class="toolbar">
     <button id="bZip">📂 Open (.zip / DICOM files)</button>
@@ -292,7 +292,7 @@ async function fillDescriptions() {
 }
 function patientBanner(m) {
   bannerMeta = m;
-  $('titleText').textContent = `🩻 ${m.patient ?? 'DICOM'} - DICOM Viewer`;
+  $('titleText').textContent = `🩻 ${m.patient ?? 'Online MRI/CT CD Viewer'} - ClearEvo`;
   if (frame) render();
 }
 let bannerMeta = null;
