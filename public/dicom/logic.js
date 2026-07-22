@@ -94,6 +94,15 @@ export function firstNum(s) {
 // normalize a DICOMDIR Referenced File ID / zip path to one comparable key
 export function normKey(name) { return name.replace(/\\/g, '/').replace(/^\//, '').toUpperCase(); }
 
+// DICOMDIR file references are relative to the DICOMDIR's own folder. A CD
+// zipped at the root has DICOMDIR at top ('' prefix); a CD the user wrapped in
+// a subfolder has e.g. 'MYCD/DICOMDIR', so its 'DICOM\\x' refs resolve to
+// 'MYCD/DICOM/X'. Try the prefixed path first, then the bare one.
+export function makeResolver(byName, dicomdirName) {
+  const prefix = normKey(dicomdirName).replace(/DICOMDIR$/, '');
+  return (fidKey) => byName.get(prefix + fidKey) || byName.get(fidKey);
+}
+
 // build per-image metadata from DICOMDIR directory records (pure).
 // records: [{type:'SERIES'|'IMAGE'|..., seriesUID, seriesNum, modality, fid, instance}]
 // resolve: (normKey) -> source item, or undefined if that file isn't present.

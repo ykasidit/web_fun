@@ -97,7 +97,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
 </div>
 <script src="./dicomParser.min.js"></script>
 <script type="module">
-import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords } from './logic.js';
+import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords, makeResolver } from './logic.js';
 import * as jpegLossless from './lossless-min.js';
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), vp = $('viewport'), ctx = cv.getContext('2d');
@@ -241,16 +241,19 @@ async function openFiles(files) {
 // series/image tree; otherwise fall back to reading every file's header.
 async function indexAndScan(all) {
   const dd = all.find((e) => /(^|\/)DICOMDIR$/i.test(e.name));
-  const byName = new Map(all.map((e) => [e.name.replace(/\\/g, '/').replace(/^\//, '').toUpperCase(), e]));
+  const byName = new Map(all.map((e) => [normKey(e.name), e]));
   if (dd) {
-    try { return await scanFromDicomdir(dd, byName); }
+    // resolve refs relative to the DICOMDIR's folder - works whether the CD is
+    // zipped at the root or wrapped in one (or more) subfolders
+    try { return await scanFromDicomdir(dd, makeResolver(byName, dd.name)); }
     catch (e) { stat(`DICOMDIR unreadable (${e.message}), scanning files...`); }
   }
+  // fallback: read every file's header - subdir-agnostic by construction
   items = all.filter((e) => !JUNK_RE.test(e.name) && e.usize < 200 * 1048576);
   await scan();
 }
 
-async function scanFromDicomdir(dd, byName) {
+async function scanFromDicomdir(dd, resolve) {
   busy(`${T.loadingIndex} (${(dd.usize / 1048576).toFixed(0)} MB)...`, 0);
   bufferCb = (f) => busy(`${T.loadingIndex}... ${Math.round(f * 100)}%`, f);
   const ddBytes = await dd.getBytes();
@@ -268,7 +271,7 @@ async function scanFromDicomdir(dd, byName) {
       modality: r.string('x00080060'), fid: r.string('x00041500'), instance: parseFloat(r.string('x00200013')),
     };
   });
-  const metas = seriesFromDicomdirRecords(records, (k) => byName.get(k));
+  const metas = seriesFromDicomdirRecords(records, resolve);
   if (!metas.length) throw new Error('no image records matched files');
   series = groupSeries(metas);
   busy(null);

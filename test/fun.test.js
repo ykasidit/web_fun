@@ -249,7 +249,7 @@ test('dicom: junk filter, magic, grouping, lut', () => {
   assert.equal(lut(4000), 255);   // bone clamps high
 });
 
-import { normKey, seriesFromDicomdirRecords } from '../public/dicom/logic.js';
+import { normKey, seriesFromDicomdirRecords, makeResolver } from '../public/dicom/logic.js';
 test('dicom: normKey + DICOMDIR record walk (pure, index-first)', () => {
   assert.equal(normKey('DICOM\\68DB8FC0'), 'DICOM/68DB8FC0');
   assert.equal(normKey('/dicom/img'), 'DICOM/IMG');
@@ -272,6 +272,23 @@ test('dicom: normKey + DICOMDIR record walk (pure, index-first)', () => {
   assert.equal(series[1].instances[0].instance, 1);    // images sorted by instance within series
   assert.equal(series[1].instances[0].name, 'DICOM/A1');
   assert.equal(seriesFromDicomdirRecords([{ type: 'IMAGE', fid: 'X' }], () => undefined).length, 0); // image before any series
+});
+
+test('dicom: DICOMDIR resolver handles root and wrapped-subdir zips', () => {
+  const records = [{ type: 'SERIES', seriesUID: 's', seriesNum: 1, modality: 'CT' }, { type: 'IMAGE', fid: 'DICOM\\A1', instance: 1 }];
+  // byName is keyed by normKey(name), exactly as the app builds it
+  const mk = (names) => new Map(names.map((n) => [normKey(n), { name: n }]));
+  // case 1: CD zipped at root - DICOMDIR at top
+  let metas = seriesFromDicomdirRecords(records, makeResolver(mk(['DICOM/A1', 'DICOMDIR']), 'DICOMDIR'));
+  assert.equal(metas.length, 1);
+  assert.equal(metas[0].name, 'DICOM/A1');
+  // case 2: user wrapped the CD in a folder - files under MYCD/, DICOMDIR at MYCD/DICOMDIR
+  metas = seriesFromDicomdirRecords(records, makeResolver(mk(['MYCD/DICOM/A1', 'MYCD/DICOMDIR']), 'MYCD/DICOMDIR'));
+  assert.equal(metas.length, 1);
+  assert.equal(metas[0].name, 'MYCD/DICOM/A1');
+  // case 3: nested deeper still resolves
+  metas = seriesFromDicomdirRecords(records, makeResolver(mk(['a/b/DICOM/A1']), 'a/b/DICOMDIR'));
+  assert.equal(metas.length, 1);
 });
 
 // ---------- dicom: real HTTP Range streaming integration ----------
