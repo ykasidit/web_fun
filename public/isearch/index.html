@@ -12,20 +12,28 @@
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono','Courier New',monospace}
-.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#fff}
-.menubar{background:#d6d0c8;border-bottom:1px solid #888;padding:2px 4px;font-size:12px;user-select:none;display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.menubar button{font:inherit;font-size:12px;cursor:pointer}
-#view,#paste{flex:1;overflow:auto;padding:6px 8px;font-size:13px;white-space:pre-wrap;word-break:break-word;margin:0;border:none;outline:none;font-family:inherit}
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,textarea,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px}
+#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
+.menubar{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+#view,#paste{flex:1;overflow:auto;padding:6px 8px;font:13px 'DejaVu Sans Mono','Courier New',monospace;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid #7f9db9;background:#fff;outline:none;color:#000}
 mark{background:#cfffc0}
-mark.cur{background:#ff9632}
-.modeline{background:#000;color:#fff;font-size:12px;padding:1px 8px;user-select:none}
-#echo{font-size:14px;padding:3px 8px;min-height:1.3em}
+mark.cur{background:#316ac5;color:#fff}
+.modeline{background:#000;color:#fff;font:12px 'DejaVu Sans Mono',monospace;padding:1px 8px;user-select:none}
+#echo{font:13px 'DejaVu Sans Mono',monospace;padding:3px 8px;min-height:1.3em}
+</style>
+<style>/* font size controls (top right) */
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
 <body>
-<div class="frame">
+<div class="window" id="app">
+  <div class="title-bar"><div class="title-bar-text">🔍 isearch (almost Emacs) - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
   <div class="menubar">
     <button id="bOpen">Open file...</button>
     <button id="bUse" hidden>Use pasted text (C-c C-c)</button>
@@ -33,12 +41,13 @@ mark.cur{background:#ff9632}
     <button id="bFwd" title="C-s">Search ▼ (C-s)</button>
     <button id="bBack" title="C-r">Search ▲ (C-r)</button>
     <button id="bCopy" title="M-w after C-x h">Copy all</button>
-    <span style="font-size:11px;margin-left:auto">an 'almost' Emacs isearch - smart case, wraps around - 100% in-browser, your text is never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_isearch_text_files_emacs_style_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></span>
   </div>
   <textarea id="paste" placeholder="Paste your text here, then press C-c C-c (or the button) and search it with C-s / C-r ..."></textarea>
   <div id="view" tabindex="0" hidden></div>
   <div class="modeline" id="modeline">-UU-:----F1  *isearch-scratch*      All L1     (Text) -- C-s search forward, C-r backward, RET done, C-g cancel</div>
   <div id="echo"></div>
+  </div>
+  <div class="status-bar"><p class="status-bar-field">an 'almost' Emacs isearch - smart case, wraps around - 100% in-browser, your text is never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_isearch_text_files_emacs_style_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
 </div>
 <script type="module">
 import { createSearch, findAll, extend, repeat, echoLine, countLabel } from './logic.js';
@@ -115,6 +124,13 @@ $('bOpen').onclick = () => {
 };
 paste.addEventListener('input', () => { $('bUse').hidden = false; });
 drawEcho('');
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
 </script>
 </body>
 </html>

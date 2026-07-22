@@ -9,27 +9,32 @@
 <link rel="canonical" href="https://www.clearevo.com/geo/">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#1e1e1e">
+<meta name="theme-color" content="#3a6ea5">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
-.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e}
-.toolbar{background:#333;border-bottom:1px solid #555;padding:6px;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.toolbar button,.toolbar select,.toolbar input{font:inherit;font-size:13px;background:#444;color:#eee;border:1px solid #666;padding:3px 8px}
-.toolbar button:hover{background:#555;cursor:pointer}
-.toolbar button:disabled{opacity:.5;cursor:default}
-#log{flex:1;overflow-y:auto;font-size:13px;line-height:1.4;padding:8px;white-space:pre-wrap}
-#log .err{color:#ff6b6b}
-#log .ok{color:#9ece6a}
-#log .warn{color:#ffb86c}
-.statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px}
-a{color:#7aa2f7}
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,textarea,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px}
+#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
+.toolbar{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+#log{flex:1;overflow-y:auto;background:#fff;border:1px solid #7f9db9;font:12px 'DejaVu Sans Mono','Courier New',monospace;line-height:1.4;padding:8px;white-space:pre-wrap;color:#333}
+#log .err{color:#c00}
+#log .ok{color:#080}
+#log .warn{color:#b60}
+#log .info{color:#000}
+</style>
+<style>/* font size controls (top right) */
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
 <body>
-<div class="frame">
+<div class="window" id="app">
+  <div class="title-bar"><div class="title-bar-text">🌍 GIS Converter (ogr2ogr) - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
   <div class="toolbar">
     <button id="bOpen">📂 Choose input file(s)</button>
     <span>→</span>
@@ -44,7 +49,8 @@ Output: GeoJSON, GPX, KML, GeoPackage, CSV, SQLite, DXF, FlatGeobuf. Optional re
 
 Choose input file(s) to begin. First use downloads the converter engine (~21 MB, cached after).
 </div>
-  <div class="statusbar">powered by <a href="https://github.com/bugra9/gdal3.js" target="_blank" rel="noopener">gdal3.js</a> (GDAL/ogr2ogr in WebAssembly) - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_convert_shapefile_geojson_kml_gpx_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+  </div>
+  <div class="status-bar"><p class="status-bar-field">powered by <a href="https://github.com/bugra9/gdal3.js" target="_blank" rel="noopener">gdal3.js</a> (GDAL/ogr2ogr in WebAssembly) - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_convert_shapefile_geojson_kml_gpx_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
 </div>
 <script src="./gdal3.js"></script>
 <script type="module">
@@ -127,6 +133,13 @@ $('bConvert').onclick = async () => {
   }
   $('bConvert').disabled = false;
 };
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
 </script>
 </body>
 </html>

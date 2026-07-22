@@ -9,34 +9,39 @@
 <link rel="canonical" href="https://www.clearevo.com/qr/">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta name="theme-color" content="#1e1e1e">
+<meta name="theme-color" content="#3a6ea5">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
-.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e;overflow-y:auto}
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,textarea,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px}
+#app>.window-body{flex:1;margin:0;padding:0;min-height:0;overflow-y:auto}
 .pad{padding:12px;max-width:720px}
-h1{font-size:16px;margin:0 0 4px}
-.pledge{color:#9ece6a;font-size:12px;margin-bottom:10px}
-label{display:block;margin:8px 0 2px;font-size:13px}
-input,select,textarea,button{font:inherit;font-size:13px;background:#444;color:#eee;border:1px solid #666;padding:4px 8px}
+h1{font-size:14px;margin:0 0 4px;font-family:inherit}
+.pledge{color:#080;font-size:11px;margin-bottom:10px}
+label{display:block;margin:8px 0 2px}
 input,textarea{width:100%;max-width:420px;box-sizing:border-box}
 textarea{height:70px}
-button{cursor:pointer;margin-right:6px}
-button:hover{background:#555}
+button{margin-right:6px}
 #out{margin-top:14px}
-#qrcanvas{background:#fff;padding:12px;image-rendering:pixelated;max-width:100%}
-#err{color:#ff6b6b;font-size:13px;margin-top:8px;white-space:pre-wrap}
+#qrcanvas{background:#fff;border:1px solid #7f9db9;padding:12px;image-rendering:pixelated;max-width:100%}
+#err{color:#c00;margin-top:8px;white-space:pre-wrap}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .langrow{float:right}
-.statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px;margin-top:auto}
-a{color:#7aa2f7}
 .hidden{display:none}
+</style>
+<style>/* font size controls (top right) */
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
 <body>
-<div class="frame">
+<div class="window" id="app">
+  <div class="title-bar"><div class="title-bar-text">🔳 QR Code Generator - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
 <div class="pad">
   <select id="lang" class="langrow" title="language"></select>
   <h1>🔳 <span id="tTitle">Free QR code generator - the QR carries the real link you typed, never expires</span></h1>
@@ -81,7 +86,8 @@ a{color:#7aa2f7}
   </div>
   <div id="err"></div>
 </div>
-<div class="statusbar">static QR only - this site never sees or stores what you encode - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_create_free_qr_codes_that_never_expire/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+</div>
+  <div class="status-bar"><p class="status-bar-field">static QR only - this site never sees or stores what you encode - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_create_free_qr_codes_that_never_expire/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
 </div>
 <script src="./qrcode.js"></script>
 <script type="module">
@@ -184,6 +190,13 @@ $('bSvg').onclick = () => {
   a.download = 'qr.svg'; a.click();
   URL.revokeObjectURL(a.href);
 };
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
 </script>
 </body>
 </html>

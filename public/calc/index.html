@@ -12,25 +12,31 @@
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono','Courier New',monospace}
-.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#fff;max-width:560px;margin:auto}
-.menubar{background:#d6d0c8;border-bottom:1px solid #888;padding:2px 4px;font-size:12px;user-select:none}
-.bufs{flex:1;display:flex;min-height:0}
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px;max-width:560px;margin:auto;max-height:96%}
+#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
+.bufs{flex:1;display:flex;min-height:0;border:1px solid #7f9db9;background:#fff}
 .bufcol{flex:1;display:flex;flex-direction:column;min-width:0}
-.trailcol{border-left:1px solid #888;flex:0 0 40%}
-#buf{flex:1;overflow-y:auto;padding:6px 8px;font-size:18px;white-space:pre}
-#trail{flex:1;overflow-y:auto;padding:6px 8px;font-size:13px;white-space:pre;color:#444}
-.modeline{background:#000;color:#fff;font-size:12px;padding:1px 8px;user-select:none;white-space:nowrap;overflow:hidden}
-#echo{font-size:13px;padding:3px 8px;color:#a00;min-height:1.2em}
-.keys{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;padding:6px;background:#d6d0c8;border-top:1px solid #888}
-.keys button{font:inherit;font-size:15px;padding:7px 0;cursor:pointer}
-.keys button.op{background:#efe7d6}
+.trailcol{border-left:1px solid #aca899;flex:0 0 40%}
+#buf{flex:1;overflow-y:auto;padding:6px 8px;font:18px 'DejaVu Sans Mono','Courier New',monospace;white-space:pre;color:#000}
+#trail{flex:1;overflow-y:auto;padding:6px 8px;font:13px 'DejaVu Sans Mono',monospace;white-space:pre;color:#444}
+.modeline{background:#000;color:#fff;font:12px 'DejaVu Sans Mono',monospace;padding:1px 8px;user-select:none;white-space:nowrap;overflow:hidden}
+#echo{font-size:11px;padding:3px 8px;color:#a00;min-height:1.2em}
+.keys{display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+.keys button{font-size:14px;padding:7px 0;min-width:0}
+</style>
+<style>/* font size controls (top right) */
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
 <body>
-<div class="frame" tabindex="0" id="frame">
-  <div class="menubar">'almost' Emacs M-x calc (RPN) - RET push/dup, TAB swap, n negate, &amp; 1/x, Q sqrt, U undo, DEL drop - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_use_the_emacs_rpn_calculator_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+<div class="window" id="app" tabindex="0">
+  <div class="title-bar"><div class="title-bar-text">🧮 Calc (almost Emacs RPN) - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
   <div class="bufs">
     <div class="bufcol">
       <div id="buf"></div>
@@ -49,6 +55,8 @@ html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono'
     <button data-k="0">0</button><button data-k=".">.</button><button class="op" data-k="n" title="negate">+/-</button><button class="op" data-k="+">+</button><button class="op" data-k="ENTER" title="push / dup">RET</button>
     <button class="op" data-k="Q" title="square root">√</button><button class="op" data-k="^">x^y</button><button class="op" data-k="&" title="1/x">1/x</button><button class="op" data-k="L" title="ln">ln</button><button class="op" data-k="U" title="undo">U undo</button>
   </div>
+  </div>
+  <div class="status-bar"><p class="status-bar-field">'almost' Emacs M-x calc - RET push/dup, TAB swap, n negate, &amp; 1/x, Q sqrt, U undo, DEL drop - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_use_the_emacs_rpn_calculator_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
 </div>
 <script type="module">
 import { createCalc, pressDigit, enter, op, undo, render } from './logic.js';
@@ -82,6 +90,13 @@ document.addEventListener('keydown', (e) => {
   if (k != null) { e.preventDefault(); key(k); }
 });
 draw();
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
 </script>
 </body>
 </html>

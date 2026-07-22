@@ -12,28 +12,32 @@
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
-.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e}
-.toolbar{background:#333;border-bottom:1px solid #555;padding:4px;font-size:12px;display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.toolbar button,.toolbar select,.toolbar input{font:inherit;font-size:12px;background:#444;color:#eee;border:1px solid #666;padding:2px 7px}
-.toolbar button:hover{background:#555;cursor:pointer}
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px}
+#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
+.toolbar{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 #findText{width:220px}
-#grid{flex:1;overflow-y:auto;font-size:13px;line-height:1.35;padding:4px 8px;white-space:pre}
-#grid .off{color:#7aa2f7}
+#grid{flex:1;overflow-y:auto;background:#fff;border:1px solid #7f9db9;font:13px 'DejaVu Sans Mono','Courier New',monospace;line-height:1.35;padding:4px 8px;white-space:pre;color:#000}
+#grid .off{color:#00589c}
 #grid .hx{cursor:pointer}
-#grid .hx.sel{background:#ff9632;color:#000}
-#grid .hx.mod{color:#ff6b6b;font-weight:bold}
-#grid .hx.hit{background:#2e5c2e}
-#grid .as{color:#aaa}
-#grid .as.sel{background:#ff9632;color:#000}
-.statusbar{background:#333;border-top:1px solid #555;font-size:12px;padding:3px 8px;display:flex;gap:18px}
-.statusbar .warn{color:#ffb86c}
-a{color:#7aa2f7}
+#grid .hx.sel{background:#316ac5;color:#fff}
+#grid .hx.mod{color:#c00;font-weight:bold}
+#grid .hx.hit{background:#c6e0c6}
+#grid .as{color:#666}
+.status-bar-field.warn{color:#a00}
+</style>
+<style>/* font size controls (top right) */
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
 <body>
-<div class="frame">
+<div class="window" id="app">
+  <div class="title-bar"><div class="title-bar-text">🔢 ClearEvo Hex Viewer/Editor</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
   <div class="toolbar">
     <button id="bOpen">📂 Open file</button>
     <button id="bSave" disabled>💾 Save edited</button>
@@ -56,22 +60,23 @@ a{color:#7aa2f7}
       </select>
     </span>
     <button id="bFind">Find next (Enter / C-s)</button>
-    <span id="preview" style="color:#9ece6a"></span>
+    <span id="preview" style="color:#080"></span>
     <span>|</span>
     <input id="goto" placeholder="goto offset (hex)" style="width:110px">
-    <span style="margin-left:auto;font-size:11px">ClearEvo Hex - 100% in-browser, file never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) -<a href="/blog/2026/07/22/how_to_view_edit_and_search_hex_files_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></span>
   </div>
   <div id="grid" tabindex="0">
 open a file to begin -
 click a byte then type hex digits to overwrite it, arrows to move,
 search supports hex sequences, text, numbers (u8..i64, LE/BE, octet-aligned),
 and bless-style BIT sequences that can match at any bit offset</div>
-  <div class="statusbar">
-    <span id="stName">no file</span>
-    <span id="stOff">offset: -</span>
-    <span id="stSel">-</span>
-    <span id="stMod" class="warn"></span>
-    <span id="stMsg"></span>
+  </div>
+  <div class="status-bar">
+    <p class="status-bar-field" id="stName">no file</p>
+    <p class="status-bar-field" id="stOff">offset: -</p>
+    <p class="status-bar-field" id="stSel">-</p>
+    <p class="status-bar-field warn" id="stMod"></p>
+    <p class="status-bar-field" id="stMsg"></p>
+    <p class="status-bar-field">100% in-browser, file never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_edit_and_search_hex_files_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></p>
   </div>
 </div>
 <script type="module">
@@ -244,6 +249,13 @@ grid.addEventListener('keydown', (e) => {
     else { nibble = 0; select(Math.min(ed.bytes.length - 1, sel + 1)); }
   }
 });
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
 </script>
 </body>
 </html>
