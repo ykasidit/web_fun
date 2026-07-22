@@ -46,7 +46,7 @@ Extract the audio track from a video (MP4/MOV/MKV → MP3...), or convert record
 
 Honest limits: in-browser conversion is ~10-20x slower than desktop ffmpeg and capped at 500 MB input - fine for audio and short clips, wrong tool for movies.
 
-Choose a file to begin. First use downloads the converter engine (~31 MB, cached after).</span>
+Choose a file to begin. First use downloads the converter engine (~10 MB, cached after).</span>
 </div>
   <div class="statusbar">powered by <a href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noopener">ffmpeg.wasm</a> - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
 </div>
@@ -59,7 +59,15 @@ function say(t, cls) { const d = document.createElement('div'); if (cls) d.class
 $('outFmt').innerHTML = OUT_FORMATS.map((f, i) => `<option value="${i}">to ${f.label} (.${f.ext})</option>`).join('');
 
 let file = null, ff = null;
-if (typeof WebAssembly === 'undefined') say('This browser has no WebAssembly - the converter cannot run here.', 'err');
+if (typeof WebAssembly === 'undefined' || typeof DecompressionStream === 'undefined') say('This browser lacks WebAssembly/DecompressionStream - the converter needs a current Chrome, Edge, Firefox or Safari.', 'err');
+
+// wasm ships gzipped (host limit + faster download); inflate client-side
+async function gunzipToBlobUrl(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`engine download failed: HTTP ${r.status}`);
+  const blob = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).blob();
+  return URL.createObjectURL(blob);
+}
 
 $('bOpen').onclick = () => {
   const i = document.createElement('input');
@@ -82,11 +90,11 @@ $('bConvert').onclick = async () => {
   const inName = 'in_' + file.name.replace(/[^\w.-]/g, '_');
   try {
     if (!ff) {
-      say('loading converter engine (~31 MB, one-time)...', 'info');
+      say('loading converter engine (~10 MB, one-time)...', 'info');
       ff = new FFmpegWASM.FFmpeg();
       ff.on('log', ({ message }) => say(message));
       ff.on('progress', ({ progress }) => { $('progFill').style.width = `${Math.min(100, progress * 100).toFixed(0)}%`; });
-      await ff.load({ coreURL: new URL('./ffmpeg-core.js', location.href).href, wasmURL: new URL('./ffmpeg-core.wasm', location.href).href });
+      await ff.load({ coreURL: new URL('./ffmpeg-core.js', location.href).href, wasmURL: await gunzipToBlobUrl('./ffmpeg-core.wasm.gz') });
       say('engine ready', 'ok');
     }
     const fmt = OUT_FORMATS[+$('outFmt').value];

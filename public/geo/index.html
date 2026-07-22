@@ -42,7 +42,7 @@ a{color:#7aa2f7}
 Input: anything ogr2ogr reads - Shapefile (select .shp + .dbf + .shx + .prj together), GeoJSON, GPX, KML/KMZ, GeoPackage, DXF, CSV, MapInfo, FlatGeobuf, GML...
 Output: GeoJSON, GPX, KML, GeoPackage, CSV, SQLite, DXF, FlatGeobuf. Optional reprojection to any EPSG code.
 
-Choose input file(s) to begin. First use downloads the converter engine (~40 MB, cached after).
+Choose input file(s) to begin. First use downloads the converter engine (~21 MB, cached after).
 </div>
   <div class="statusbar">powered by <a href="https://github.com/bugra9/gdal3.js" target="_blank" rel="noopener">gdal3.js</a> (GDAL/ogr2ogr in WebAssembly) - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
 </div>
@@ -55,7 +55,15 @@ function say(t, cls) { const d = document.createElement('div'); if (cls) d.class
 $('outFmt').innerHTML = OUT_FORMATS.map((f, i) => `<option value="${i}">to ${f.label} (.${f.ext})</option>`).join('');
 
 let files = null, gdal = null;
-if (typeof WebAssembly === 'undefined') say('This browser has no WebAssembly - the converter cannot run here.', 'err');
+if (typeof WebAssembly === 'undefined' || typeof DecompressionStream === 'undefined') say('This browser lacks WebAssembly/DecompressionStream - the converter needs a current Chrome, Edge, Firefox or Safari.', 'err');
+
+// wasm ships gzipped (host limit + faster download); inflate client-side
+async function gunzipToBlobUrl(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`engine download failed: HTTP ${r.status}`);
+  const blob = await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).blob();
+  return URL.createObjectURL(blob);
+}
 
 $('bOpen').onclick = () => {
   const i = document.createElement('input');
@@ -79,8 +87,8 @@ $('bConvert').onclick = async () => {
   $('bConvert').disabled = true;
   try {
     if (!gdal) {
-      say('loading converter engine (~40 MB, one-time)...');
-      gdal = await initGdalJs({ path: '.', useWorker: false });
+      say('loading converter engine (~21 MB, one-time)...');
+      gdal = await initGdalJs({ path: '.', paths: { wasm: await gunzipToBlobUrl('./gdal3WebAssembly.wasm.gz') }, useWorker: false });
       say('engine ready', 'ok');
     }
     const fmt = OUT_FORMATS[+$('outFmt').value];
