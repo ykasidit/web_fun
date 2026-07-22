@@ -202,7 +202,7 @@ function makeZip(entries) { // [{name, data(Buffer), method}]
   eocd.writeUInt32LE(cdBuf.length, 12); eocd.writeUInt32LE(off, 16);
   return new Uint8Array(Buffer.concat([...parts.flat(), cdBuf, eocd]));
 }
-const nodeInflate = async (u8) => new Uint8Array(zlib.inflateRawSync(u8));
+const nodeInflate = async (u8, maxBytes) => { const out = new Uint8Array(zlib.inflateRawSync(u8)); return maxBytes ? out.subarray(0, maxBytes) : out; };
 test('geo: kmz extraction, stored and deflated', async () => {
   const kml = Buffer.from('<kml>hello</kml>');
   const zStored = makeZip([{ name: 'img.png', data: Buffer.from('x'), method: 0 }, { name: 'doc.kml', data: kml, method: 0 }]);
@@ -211,4 +211,40 @@ test('geo: kmz extraction, stored and deflated', async () => {
   assert.equal(Buffer.from(await kmzExtractKml(zDeflate, nodeInflate)).toString(), '<kml>hello</kml>');
   await assert.rejects(() => kmzExtractKml(new Uint8Array([1, 2, 3]), nodeInflate), /not a valid/);
   await assert.rejects(() => kmzExtractKml(makeZip([{ name: 'a.txt', data: kml, method: 0 }]), nodeInflate), /no \.kml/);
+});
+
+// ---------- dicom ----------
+import { zipEntries, zipData, JUNK_RE as DJUNK, looksDicom, groupSeries, firstNum, makeLut } from '../public/dicom/logic.js';
+test('dicom: zip range-reader entries + extract', async () => {
+  const kml = Buffer.from('x'.repeat(500));
+  const z = makeZip([{ name: 'DICOM/A1', data: kml, method: 8 }, { name: 'AUTORUN.INF', data: Buffer.from('y'), method: 0 }]);
+  const readRange = async (off, len) => z.subarray(off, off + len);
+  const es = await zipEntries(readRange, z.length);
+  assert.equal(es.length, 2);
+  const dicom = es.find((e) => e.name === 'DICOM/A1');
+  const all = await zipData(readRange, dicom, nodeInflate);
+  assert.equal(all.length, 500);
+  const head = await zipData(readRange, dicom, nodeInflate, 100);
+  assert.equal(head.length, 100);
+});
+test('dicom: junk filter, magic, grouping, lut', () => {
+  assert.ok(DJUNK.test('Autorun/Autorun.exe'));
+  assert.ok(DJUNK.test('VIEWER/VIEWDIRT.HLP'));
+  assert.ok(DJUNK.test('DICOMDIR'));
+  assert.ok(!DJUNK.test('DICOM/68DB8FC0'));
+  const b = new Uint8Array(200); b.set([0x44, 0x49, 0x43, 0x4d], 128);
+  assert.ok(looksDicom(b));
+  assert.ok(!looksDicom(new Uint8Array(200)));
+  const s = groupSeries([
+    { seriesUID: 'b', seriesNum: 2, instance: 2, name: 'x2' },
+    { seriesUID: 'b', seriesNum: 2, instance: 1, name: 'x1' },
+    { seriesUID: 'a', seriesNum: 1, instance: 5, name: 'y' }]);
+  assert.equal(s[0].uid, 'a');
+  assert.equal(s[1].instances[0].instance, 1);
+  assert.equal(firstNum('40\\80'), 40);
+  assert.equal(firstNum(''), null);
+  const lut = makeLut(1, -1024, 40, 400, false); // CT soft tissue
+  assert.equal(lut(1064), 128);   // HU 40 = center
+  assert.equal(lut(0), 0);        // air clamps low
+  assert.equal(lut(4000), 255);   // bone clamps high
 });

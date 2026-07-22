@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DICOM Viewer online - open a CT/MRI CD (zip) in your browser, no upload, works on phones</title>
+<meta name="description" content="Free online DICOM viewer: open the zipped CD from your CT or MRI scan and browse it right in your browser - series list, slice scrolling, window/level, zoom - on desktop and phones. 100% client-side: your medical images are never uploaded anywhere.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩻</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/dicom/">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#3a6ea5">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<link rel="stylesheet" href="xp.css">
+<style>
+html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
+body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
+.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
+#app{display:flex;flex-direction:column;position:absolute;inset:4px}
+#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
+.toolbar{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.toolbar button.on{box-shadow:inset 1px 1px 3px rgba(0,0,0,.4);background:#d8d4c8}
+#main{flex:1;display:flex;min-height:0;gap:4px}
+#serieslist{flex:0 0 168px;overflow-y:auto;background:#fff;border:1px solid #7f9db9;padding:2px}
+.ser{display:flex;gap:4px;align-items:center;padding:3px;cursor:pointer;border-bottom:1px solid #eee}
+.ser:hover{background:#e8f0fb}
+.ser.on{background:#316ac5;color:#fff}
+.ser canvas{background:#000;flex:0 0 48px}
+.ser .lbl{font-size:10px;overflow:hidden}
+#viewport{flex:1;position:relative;background:#000;border:1px solid #7f9db9;min-width:0;overflow:hidden;touch-action:none;cursor:crosshair}
+#cv{position:absolute;inset:0;width:100%;height:100%}
+.ov{position:absolute;color:#ffdf60;font:11px 'DejaVu Sans Mono',monospace;text-shadow:1px 1px 2px #000;pointer-events:none;white-space:pre;line-height:1.35}
+#ovTL{top:4px;left:6px} #ovTR{top:4px;right:6px;text-align:right} #ovBL{bottom:4px;left:6px} #ovBR{bottom:4px;right:6px;text-align:right}
+#sliceRow{display:flex;gap:6px;align-items:center}
+#slice{flex:1}
+@media (max-width:700px){
+  #main{flex-direction:column}
+  #serieslist{flex:0 0 84px;display:flex;overflow-x:auto;overflow-y:hidden}
+  .ser{flex:0 0 130px;border-bottom:none;border-right:1px solid #eee}
+}
+</style>
+<style>/* font size controls (top right) */
+.title-bar-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:64px}
+.title-bar-controls{position:fixed;top:8px;right:10px;display:flex;align-items:center;z-index:999}
+.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
+</style>
+</head>
+<body>
+<div class="window" id="app">
+  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 DICOM Viewer - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="window-body">
+  <div class="toolbar">
+    <button id="bZip">📂 Open (.zip / DICOM files)</button>
+    <button id="bDir" title="an unzipped CD folder">📁 Folder</button>
+    <span>|</span>
+    <button id="tBrowse" class="on" title="drag/swipe to scroll slices (mouse wheel always scrolls)">Browse</button>
+    <button id="tWL" title="drag: left-right = width, up-down = center">W/L</button>
+    <button id="tPan">Pan</button>
+    <button id="tZoom" title="drag up/down to zoom (pinch on touch)">Zoom</button>
+    <button id="tMeasure" title="click two points to measure distance">📏</button>
+    <button id="bReset" title="reset zoom/pan/window">Reset</button>
+    <button id="bInvert">Invert</button>
+    <button id="bTags" title="all DICOM tags of the current image">Tags</button>
+    <select id="preset" title="CT window presets"></select>
+    <span id="stat"></span>
+  </div>
+  <div id="main">
+    <div id="serieslist"></div>
+    <div id="viewport">
+      <canvas id="cv"></canvas>
+      <div class="ov" id="ovTL"></div><div class="ov" id="ovTR"></div>
+      <div class="ov" id="ovBL"></div><div class="ov" id="ovBR"></div>
+      <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
+    </div>
+  </div>
+  <div id="sliceRow">
+    <button id="bPrev">◀</button>
+    <input type="range" id="slice" min="0" max="0" value="0">
+    <button id="bNext">▶</button>
+    <span id="sliceLbl">-/-</span>
+  </div>
+  </div>
+  <div class="status-bar"><p class="status-bar-field">100% in-browser - your medical images are NEVER uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - not a medical device: for personal viewing, not diagnosis</p></div>
+</div>
+<script src="./dicomParser.min.js"></script>
+<script type="module">
+import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut } from './logic.js';
+import * as jpegLossless from './lossless-min.js';
+const $ = (id) => document.getElementById(id);
+const cv = $('cv'), vp = $('viewport'), ctx = cv.getContext('2d');
+const stat = (t) => { $('stat').textContent = t; };
+
+if (typeof DecompressionStream === 'undefined') stat('this browser lacks DecompressionStream - use a current Chrome/Edge/Firefox/Safari');
+
+// inflate raw deflate, optionally stopping after maxBytes (for header scans)
+async function inflateRaw(raw, maxBytes) {
+  const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  const reader = stream.getReader();
+  const chunks = []; let got = 0;
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      chunks.push(value); got += value.length;
+      if (maxBytes && got >= maxBytes) { reader.cancel().catch(() => {}); break; }
+    }
+  } catch (e) { if (!maxBytes) throw e; /* truncated input is expected on header scans */ }
+  const out = new Uint8Array(got);
+  let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
+  return maxBytes ? out.subarray(0, Math.min(maxBytes, got)) : out;
+}
+
+// ---- source abstraction: zip entries or plain files ----
+let items = [];        // [{name, usize, getBytes(headBytes?)}]
+let series = [], cur = null, idx = 0;
+
+async function openZip(file) {
+  const readRange = async (off, len) => new Uint8Array(await file.slice(off, off + len).arrayBuffer());
+  const entries = await zipEntries(readRange, file.size);
+  items = entries.filter((e) => !JUNK_RE.test(e.name) && e.usize < 100 * 1048576)
+    .map((e) => ({ name: e.name, usize: e.usize, getBytes: (h) => zipData(readRange, e, inflateRaw, h) }));
+  await scan();
+}
+async function openFiles(files) {
+  items = [...files].filter((f) => !JUNK_RE.test(f.webkitRelativePath || f.name) && f.size < 100 * 1048576 && f.size > 0)
+    .map((f) => ({ name: f.webkitRelativePath || f.name, usize: f.size,
+      getBytes: async (h) => new Uint8Array(await (h ? f.slice(0, h) : f).arrayBuffer()) }));
+  await scan();
+}
+
+function dsMeta(ds, name) {
+  const num = (t) => { const v = ds.string(t); return v == null ? null : parseFloat(v); };
+  return {
+    name, seriesUID: ds.string('x0020000e'), seriesNum: num('x00200011'), seriesDesc: ds.string('x0008103e'),
+    modality: ds.string('x00080060'), instance: num('x00200013'),
+    patient: ds.string('x00100010'), pid: ds.string('x00100020'), dob: ds.string('x00100030'), sex: ds.string('x00100040'),
+    study: ds.string('x00081030'), studyDate: ds.string('x00080020'), institution: ds.string('x00080080'),
+  };
+}
+function parseHead(bytes) {
+  try { return dicomParser.parseDicom(bytes, { untilTag: 'x7fe00010' }); }
+  catch (e) { return e && e.dataSet ? e.dataSet : null; }
+}
+
+async function scan() {
+  series = []; cur = null; $('serieslist').innerHTML = ''; drawEmpty();
+  const metas = []; let done = 0;
+  const work = items.slice();
+  const worker = async () => {
+    for (;;) {
+      const it = work.shift();
+      if (!it) return;
+      try {
+        const head = await it.getBytes(65536);
+        if (looksDicom(head)) {
+          const ds = parseHead(head);
+          if (ds && ds.string('x0020000e')) metas.push({ ...dsMeta(ds, it.name), item: it });
+        }
+      } catch {}
+      stat(`scanning ${++done}/${items.length}...`);
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  if (!metas.length) { stat('no DICOM images found - is this a DICOM CD zip/folder?'); return; }
+  series = groupSeries(metas);
+  stat(`${series.length} series, ${metas.length} images - nothing was uploaded`);
+  const pat = metas[0];
+  $('titleText').textContent = `🩻 ${pat.patient ?? 'DICOM'} - DICOM Viewer`;
+  renderSeriesList();
+  selectSeries(series[0]);
+}
+
+function renderSeriesList() {
+  const box = $('serieslist'); box.innerHTML = '';
+  for (const s of series) {
+    const d = document.createElement('div');
+    d.className = 'ser';
+    d.innerHTML = `<canvas width="48" height="48"></canvas><div class="lbl"><b>S${s.num ?? '?'} ${s.modality}</b><br>${(s.desc || '').slice(0, 40)}<br>${s.instances.length} img</div>`;
+    d.onclick = () => selectSeries(s);
+    s.el = d; box.appendChild(d);
+    thumbQueue.push(s);
+  }
+  pumpThumbs();
+}
+
+// ---- decode one instance -> {gray canvas, meta} ----
+const UNCOMPRESSED = ['1.2.840.10008.1.2', '1.2.840.10008.1.2.1', '1.2.840.10008.1.2.2'];
+const JPEG_LOSSLESS = ['1.2.840.10008.1.2.4.70', '1.2.840.10008.1.2.4.57'];
+const JPEG_BASELINE = ['1.2.840.10008.1.2.4.50', '1.2.840.10008.1.2.4.51'];
+
+async function decodeInstance(inst) {
+  const bytes = await inst.item.getBytes();
+  const ds = dicomParser.parseDicom(bytes);
+  const ts = (ds.string('x00020010') || '1.2.840.10008.1.2').trim();
+  const rows = ds.uint16('x00280010'), cols = ds.uint16('x00280011');
+  const bits = ds.uint16('x00280100'), signed = ds.uint16('x00280103') === 1;
+  const samples = ds.uint16('x00280002') || 1;
+  const photo = (ds.string('x00280004') || 'MONOCHROME2').trim();
+  const el = ds.elements.x7fe00010;
+  if (!el) throw new Error('no pixel data');
+  let px;
+  if (UNCOMPRESSED.includes(ts)) {
+    const bo = ds.byteArray.buffer, off = ds.byteArray.byteOffset + el.dataOffset;
+    if (ts.endsWith('.2')) throw new Error('big-endian DICOM not supported yet');
+    px = bits <= 8 ? new Uint8Array(bo, off, rows * cols * samples)
+      : signed ? new Int16Array(bo, off, rows * cols * samples) : new Uint16Array(bo, off, rows * cols * samples);
+  } else if (JPEG_LOSSLESS.includes(ts)) {
+    const frame = el.fragments && el.fragments.length > 1
+      ? dicomParser.readEncapsulatedPixelDataFromFragments(ds, el, 0, el.fragments.length)
+      : dicomParser.readEncapsulatedPixelDataFromFragments(ds, el, 0);
+    const out = new jpegLossless.Decoder().decompress(frame.buffer, frame.byteOffset, frame.length);
+    px = bits <= 8 ? new Uint8Array(out) : signed ? new Int16Array(out) : new Uint16Array(out);
+  } else if (JPEG_BASELINE.includes(ts)) {
+    // ultrasound & co: standard JPEG inside - the browser decodes it natively
+    const frame = el.fragments && el.fragments.length
+      ? dicomParser.readEncapsulatedPixelDataFromFragments(ds, el, 0, el.fragments.length)
+      : new Uint8Array(ds.byteArray.buffer, ds.byteArray.byteOffset + el.dataOffset, el.length);
+    const bmp = await createImageBitmap(new Blob([frame], { type: 'image/jpeg' }));
+    const nf = firstNum(ds.string('x00280008'));
+    if (nf > 1) stat(`multi-frame clip: showing frame 1/${nf} (cine not supported yet)`);
+    return { bitmap: bmp, rows: bmp.height, cols: bmp.width, samples, photo, slope: 1, icept: 0, wc0: 128, ww0: 256, ts, ds, spacing: spacingOf(ds) };
+  } else {
+    throw new Error(`transfer syntax ${ts} not supported yet (JPEG 2000 / RLE CDs) - tell me in the blog comments`);
+  }
+  const slope = firstNum(ds.string('x00281053')) ?? 1;
+  const icept = firstNum(ds.string('x00281052')) ?? 0;
+  let wc = firstNum(ds.string('x00281050')), ww = firstNum(ds.string('x00281051'));
+  if (wc == null || ww == null) {
+    let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < px.length; i += 7) { const v = px[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    wc = ((mn + mx) / 2) * slope + icept; ww = Math.max(1, (mx - mn)) * slope;
+  }
+  return { px, rows, cols, samples, photo, slope, icept, wc0: wc, ww0: ww, ts, ds, spacing: spacingOf(ds) };
+}
+function spacingOf(ds) {
+  const v = ds.string('x00280030') || ds.string('x00181164'); // PixelSpacing, else ImagerPixelSpacing
+  if (!v) return null;
+  const [r, c] = String(v).split('\\').map(parseFloat);
+  return Number.isFinite(r) && Number.isFinite(c) ? { r, c } : null;
+}
+
+function paint(fr, wc, ww, invert) {
+  const off = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(fr.cols, fr.rows) : document.createElement('canvas');
+  off.width = fr.cols; off.height = fr.rows;
+  const c2 = off.getContext('2d');
+  const img = c2.createImageData(fr.cols, fr.rows);
+  const d = img.data;
+  if (fr.samples === 3) {
+    for (let i = 0, p = 0; i < fr.px.length; i += 3, p += 4) { d[p] = fr.px[i]; d[p + 1] = fr.px[i + 1]; d[p + 2] = fr.px[i + 2]; d[p + 3] = 255; }
+  } else {
+    const lut = makeLut(fr.slope, fr.icept, wc, ww, invert !== (fr.photo === 'MONOCHROME1'));
+    for (let i = 0, p = 0; i < fr.px.length; i++, p += 4) { const y = lut(fr.px[i]); d[p] = d[p + 1] = d[p + 2] = y; d[p + 3] = 255; }
+  }
+  c2.putImageData(img, 0, 0);
+  return off;
+}
+
+// ---- viewer state ----
+let frame = null, wc = 0, ww = 1, invert = false, zoom = 1, panX = 0, panY = 0, tool = 'browse', needWL = true;
+let measure = [], lastTf = null, lastTap = 0;
+const cache = new Map(); // idx -> frame
+function cachePut(k, v) { cache.set(k, v); if (cache.size > 16) cache.delete(cache.keys().next().value); }
+
+async function selectSeries(s) {
+  cur = s; idx = 0; cache.clear(); zoom = 1; panX = panY = 0; invert = false; needWL = true;
+  series.forEach((x) => x.el && x.el.classList.toggle('on', x === s));
+  $('slice').max = s.instances.length - 1; $('slice').value = 0;
+  await show(0);
+}
+async function show(i) {
+  if (!cur) return;
+  idx = Math.max(0, Math.min(cur.instances.length - 1, i));
+  measure = [];
+  $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${cur.instances.length}`;
+  try {
+    let fr = cache.get(idx);
+    if (!fr) { stat('loading...'); fr = await decodeInstance(cur.instances[idx]); cachePut(idx, fr); stat(''); }
+    frame = fr;
+    if (needWL) { wc = fr.wc0; ww = fr.ww0; needWL = false; }
+    if (presetSel.value !== '0') { const p = CT_PRESETS[+presetSel.value]; wc = p.wc; ww = p.ww; }
+    render();
+    // prefetch neighbours quietly
+    for (const j of [idx + 1, idx - 1]) {
+      if (j >= 0 && j < cur.instances.length && !cache.has(j)) {
+        decodeInstance(cur.instances[j]).then((f) => cachePut(j, f)).catch(() => {});
+        break;
+      }
+    }
+  } catch (e) { stat(`cannot display: ${e.message}`); }
+}
+function drawEmpty() {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = '#888'; ctx.font = '13px Tahoma';
+  ctx.fillText('Open your DICOM CD (.zip) or its unzipped folder - images stay on this device.', 20, 40);
+}
+function render() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  if (!frame) { drawEmpty(); return; }
+  const off = frame.bitmap ?? paint(frame, wc, ww, invert);
+  const base = Math.min(w / frame.cols, h / frame.rows) * zoom;
+  const dw = frame.cols * base, dh = frame.rows * base;
+  const ox = (w - dw) / 2 + panX, oy = (h - dh) / 2 + panY;
+  lastTf = { base, ox, oy };
+  ctx.imageSmoothingEnabled = frame.bitmap ? true : base < 2;
+  ctx.drawImage(off, ox, oy, dw, dh);
+  if (measure.length) {
+    ctx.strokeStyle = '#00e5ff'; ctx.fillStyle = '#00e5ff'; ctx.lineWidth = 1.5; ctx.font = '12px Tahoma';
+    const P = measure.map((p) => [ox + p.x * base, oy + p.y * base]);
+    for (const [x, y] of P) { ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.stroke(); }
+    if (P.length === 2) {
+      ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); ctx.lineTo(P[1][0], P[1][1]); ctx.stroke();
+      const dxi = measure[1].x - measure[0].x, dyi = measure[1].y - measure[0].y;
+      const label = frame.spacing ? `${Math.hypot(dxi * frame.spacing.c, dyi * frame.spacing.r).toFixed(1)} mm`
+                                  : `${Math.hypot(dxi, dyi).toFixed(0)} px (no pixel spacing)`;
+      ctx.fillText(label, (P[0][0] + P[1][0]) / 2 + 6, (P[0][1] + P[1][1]) / 2 - 6);
+    }
+  }
+  const p = cur.instances[0];
+  $('ovTL').textContent = [p.patient, p.pid && `ID: ${p.pid}`, p.dob && `DOB: ${p.dob}`, p.sex].filter(Boolean).join('\n');
+  $('ovTR').textContent = [p.institution, p.study, p.studyDate].filter(Boolean).join('\n');
+  $('ovBL').textContent = `S${cur.num ?? '?'} ${cur.modality} ${cur.desc}\nimg ${idx + 1}/${cur.instances.length}  ${frame.cols}x${frame.rows}`;
+  $('ovBR').textContent = frame.bitmap ? `zoom ${(zoom * 100).toFixed(0)}%` : `WL ${Math.round(wc)} / WW ${Math.round(ww)}\nzoom ${(zoom * 100).toFixed(0)}%`;
+}
+
+// thumbnails, lazily after scan
+const thumbQueue = [];
+async function pumpThumbs() {
+  while (thumbQueue.length) {
+    const s = thumbQueue.shift();
+    try {
+      const fr = await decodeInstance(s.instances[Math.floor(s.instances.length / 2)]);
+      const t = s.el.querySelector('canvas'), tc = t.getContext('2d');
+      tc.drawImage(paint(fr, fr.wc0, fr.ww0, false), 0, 0, 48, 48);
+    } catch {}
+  }
+}
+
+// ---- input wiring ----
+const presetSel = $('preset');
+presetSel.innerHTML = CT_PRESETS.map((p, i) => `<option value="${i}">${p.label}</option>`).join('');
+presetSel.onchange = () => { const p = CT_PRESETS[+presetSel.value]; if (p.wc != null) { wc = p.wc; ww = p.ww; } else if (frame) { wc = frame.wc0; ww = frame.ww0; } render(); };
+async function openAny(files) {
+  try {
+    if (files.length === 1 && /\.(zip)$/i.test(files[0].name)) { stat('reading archive index...'); await openZip(files[0]); }
+    else await openFiles(files);
+  } catch (e) { stat(e.message); }
+}
+$('bZip').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.multiple = true;
+  i.onchange = () => { if (i.files.length) openAny(i.files); }; i.click(); };
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) openAny(e.dataTransfer.files); });
+$('bDir').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.webkitdirectory = true;
+  i.onchange = async () => { if (i.files.length) { try { await openFiles(i.files); } catch (e) { stat(e.message); } } }; i.click(); };
+const TOOLS = [['tBrowse', 'browse'], ['tWL', 'wl'], ['tPan', 'pan'], ['tZoom', 'zoom'], ['tMeasure', 'measure']];
+for (const [id, t] of TOOLS) {
+  $(id).onclick = () => { tool = t; for (const [id2, t2] of TOOLS) $(id2).classList.toggle('on', t2 === tool); };
+}
+$('bTags').onclick = () => {
+  const el = $('tags');
+  if (el.style.display === 'block') { el.style.display = 'none'; return; }
+  if (!frame || !frame.ds) return;
+  const rows = [];
+  for (const k of Object.keys(frame.ds.elements).sort()) {
+    const e = frame.ds.elements[k];
+    let v = '';
+    if (e.length < 200 && !e.items && k !== 'x7fe00010') { try { v = frame.ds.string(k) ?? ''; } catch {} }
+    rows.push(`(${k.slice(1, 5)},${k.slice(5)}) ${e.vr || '  '} len=${String(e.length).padStart(7)}  ${v}`);
+  }
+  el.textContent = rows.join('\n');
+  el.style.display = 'block';
+};
+$('bReset').onclick = () => { zoom = 1; panX = panY = 0; if (frame) { wc = frame.wc0; ww = frame.ww0; } presetSel.value = '0'; render(); };
+$('bInvert').onclick = () => { invert = !invert; render(); };
+$('bPrev').onclick = () => show(idx - 1);
+$('bNext').onclick = () => show(idx + 1);
+$('slice').oninput = () => show(+$('slice').value);
+vp.addEventListener('wheel', (e) => { e.preventDefault(); show(idx + (e.deltaY > 0 ? 1 : -1)); }, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowRight') show(idx + 1);
+  if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') show(idx - 1);
+});
+window.addEventListener('resize', render);
+
+// pointer: mouse drag + touch (1-finger tool, 2-finger pinch zoom / pan)
+const pts = new Map();
+let pinchD = 0, browseAcc = 0;
+vp.addEventListener('pointerdown', (e) => {
+  vp.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 });
+  if (pts.size === 2) { const [a, b] = [...pts.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); }
+  if (tool === 'measure' && frame && lastTf && pts.size === 1) {
+    const r = vp.getBoundingClientRect();
+    const ix = (e.clientX - r.left - lastTf.ox) / lastTf.base, iy = (e.clientY - r.top - lastTf.oy) / lastTf.base;
+    if (measure.length >= 2) measure = [];
+    measure.push({ x: ix, y: iy }); render();
+  }
+  // double-tap: photo-app zoom toggle
+  const now = performance.now();
+  if (pts.size === 1 && now - lastTap < 320) { zoom = zoom > 1.05 ? 1 : 2.5; if (zoom === 1) { panX = panY = 0; } render(); }
+  lastTap = now;
+});
+vp.addEventListener('pointerup', (e) => { pts.delete(e.pointerId); browseAcc = 0; });
+vp.addEventListener('pointercancel', (e) => { pts.delete(e.pointerId); browseAcc = 0; });
+vp.addEventListener('pointermove', (e) => {
+  const p = pts.get(e.pointerId);
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (pts.size === 2) {
+    const [a, b] = [...pts.values()];
+    p.x = e.clientX; p.y = e.clientY;
+    const [a2, b2] = [...pts.values()];
+    const d2 = Math.hypot(a2.x - b2.x, a2.y - b2.y);
+    if (pinchD) zoom = Math.max(0.2, Math.min(12, zoom * (d2 / pinchD)));
+    pinchD = d2;
+    panX += dx / 2; panY += dy / 2;
+    render();
+    return;
+  }
+  p.x = e.clientX; p.y = e.clientY;
+  if (tool === 'wl' && frame && !frame.bitmap) { ww = Math.max(1, ww + dx * (ww / 200 + 1)); wc = wc + dy * (ww / 400 + 0.5); render(); }
+  else if (tool === 'pan') { panX += dx; panY += dy; render(); }
+  else if (tool === 'zoom') { zoom = Math.max(0.2, Math.min(12, zoom * (1 - dy / 150))); render(); }
+  else if (tool === 'browse' && cur) {
+    if (zoom > 1.05) { panX += dx; panY += dy; render(); return; }  // photo-app: zoomed = drag pans
+    browseAcc += (Math.abs(dx) > Math.abs(dy) ? dx : dy);
+    const step = Math.max(24, vp.clientHeight / Math.max(1, cur.instances.length));
+    while (browseAcc >= step) { browseAcc -= step; show(idx + 1); }
+    while (browseAcc <= -step) { browseAcc += step; show(idx - 1); }
+  }
+});
+vp.addEventListener('dblclick', () => { zoom = 1; panX = panY = 0; render(); });
+drawEmpty();
+// test/demo hook: #load=<same-origin zip url>
+if (location.hash.startsWith('#load=')) {
+  (async () => {
+    try {
+      const u = location.hash.slice(6);
+      stat('fetching ' + u + '...');
+      const r = await fetch(u);
+      const b = await r.blob();
+      await openZip(new File([b], u.split('/').pop()));
+    } catch (e) { stat('load failed: ' + e.message); }
+  })();
+}
+</script>
+<script>/* zoom persisted per tool family */
+(function(){var z=+localStorage.getItem('ce_zoom')||100;
+var ap=function(){document.body.style.zoom=z+'%';try{localStorage.setItem('ce_zoom',z)}catch(e){}};
+document.getElementById('fMinus').onclick=function(){z=Math.max(60,z-10);ap();};
+document.getElementById('fPlus').onclick=function(){z=Math.min(200,z+10);ap();};
+ap();})();
+</script>
+</body>
+</html>
