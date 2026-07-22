@@ -248,3 +248,90 @@ test('dicom: junk filter, magic, grouping, lut', () => {
   assert.equal(lut(0), 0);        // air clamps low
   assert.equal(lut(4000), 255);   // bone clamps high
 });
+
+import { normKey, seriesFromDicomdirRecords } from '../public/dicom/logic.js';
+test('dicom: normKey + DICOMDIR record walk (pure, index-first)', () => {
+  assert.equal(normKey('DICOM\\68DB8FC0'), 'DICOM/68DB8FC0');
+  assert.equal(normKey('/dicom/img'), 'DICOM/IMG');
+  // synthetic DICOMDIR: 2 series, images referenced by file id, some missing
+  const items = { 'DICOM/A1': { name: 'DICOM/A1' }, 'DICOM/A2': { name: 'DICOM/A2' }, 'DICOM/B1': { name: 'DICOM/B1' } };
+  const records = [
+    { type: 'PATIENT' }, { type: 'STUDY' },
+    { type: 'SERIES', seriesUID: 's1', seriesNum: 2, modality: 'CT' },
+    { type: 'IMAGE', fid: 'DICOM\\A2', instance: 2 },
+    { type: 'IMAGE', fid: 'DICOM\\A1', instance: 1 },
+    { type: 'IMAGE', fid: 'DICOM\\MISSING', instance: 3 }, // file not present -> skipped
+    { type: 'SERIES', seriesUID: 's2', seriesNum: 1, modality: 'MR' },
+    { type: 'IMAGE', fid: 'DICOM\\B1', instance: 1 },
+  ];
+  const metas = seriesFromDicomdirRecords(records, (k) => items[k]);
+  assert.equal(metas.length, 3);                       // MISSING dropped, no per-file read needed
+  const series = groupSeries(metas);
+  assert.equal(series.length, 2);
+  assert.equal(series[0].uid, 's2');                   // sorted by series number (1 before 2)
+  assert.equal(series[1].instances[0].instance, 1);    // images sorted by instance within series
+  assert.equal(series[1].instances[0].name, 'DICOM/A1');
+  assert.equal(seriesFromDicomdirRecords([{ type: 'IMAGE', fid: 'X' }], () => undefined).length, 0); // image before any series
+});
+
+// ---------- dicom: real HTTP Range streaming integration ----------
+// spins a minimal range-capable static server (any range server works -
+// caddy, rust static-web-server, python RangeHTTPServer; we inline one so
+// the test needs no external dependency) and drives the SAME zip index
+// reader the viewer uses over real HTTP Range requests.
+import http from 'node:http';
+import os from 'node:os';
+import { writeFileSync, createReadStream, statSync, unlinkSync } from 'node:fs';
+test('dicom: zip index + slice read over real HTTP Range (streaming)', async () => {
+  // 24 uncompressed 'slices' of 40KB each ~= a small CD; we open the index + 3
+  const N = 24, SZ = 40000, payloads = {};
+  const spec = [{ name: 'AUTORUN.INF', data: Buffer.from('x'), method: 0 }];
+  for (let i = 0; i < N; i++) { const nm = `DICOM/IMG${i}`; payloads[nm] = Buffer.alloc(SZ, 65 + (i % 26)); spec.push({ name: nm, data: payloads[nm], method: 0 }); }
+  const zip = makeZip(spec);
+  const tmp = os.tmpdir() + '/dcm_stream_' + process.pid + '.zip';
+  writeFileSync(tmp, zip);
+  let served206 = 0, servedBytes = 0;
+  const server = http.createServer((req, res) => {
+    const st = statSync(tmp);
+    const m = /bytes=(\d+)-(\d*)/.exec(req.headers.range || '');
+    if (m) {
+      const start = +m[1], end = m[2] ? +m[2] : st.size - 1;
+      served206++; servedBytes += end - start + 1;
+      res.writeHead(206, { 'Content-Range': `bytes ${start}-${end}/${st.size}`, 'Content-Length': end - start + 1, 'Accept-Ranges': 'bytes' });
+      if (req.method === 'HEAD') return res.end();
+      createReadStream(tmp, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, { 'Content-Length': st.size, 'Accept-Ranges': 'bytes' });
+      if (req.method === 'HEAD') return res.end();
+      createReadStream(tmp).pipe(res);
+    }
+  });
+  await new Promise((r) => server.listen(0, r));
+  const url = `http://127.0.0.1:${server.address().port}/cd.zip`;
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const size = +head.headers.get('content-length');
+    assert.equal(size, zip.length);
+    const readRange = async (off, len) => {
+      const r = await fetch(url, { headers: { Range: `bytes=${off}-${off + len - 1}` } });
+      assert.equal(r.status, 206, 'server must answer Range with 206');
+      return new Uint8Array(await r.arrayBuffer());
+    };
+    // index the archive over HTTP, then read each entry's bytes - same path as the viewer
+    const entries = await zipEntries(readRange, size);
+    const dicom = entries.filter((e) => /^DICOM\//.test(e.name));
+    assert.equal(dicom.length, N);
+    const afterIndex = servedBytes;
+    // open only 3 'slices' (first, middle, last) - like scrolling a few images
+    for (const e of [dicom[0], dicom[12], dicom[N - 1]]) {
+      const bytes = await zipData(readRange, e, nodeInflate);
+      assert.equal(Buffer.from(bytes).toString(), payloads[e.name].toString());
+    }
+    assert.ok(served206 >= 4, 'used Range requests (206)');
+    assert.ok(afterIndex < size / 2, `index read ${afterIndex}B stayed small vs ${size}B`);
+    assert.ok(servedBytes < size, `streamed ${servedBytes}B < full ${size}B (never downloaded whole)`);
+  } finally {
+    await new Promise((r) => server.close(r));
+    unlinkSync(tmp);
+  }
+});

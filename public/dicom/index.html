@@ -54,6 +54,11 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
   <div class="toolbar">
     <button id="bZip">📂 Open (.zip / DICOM files)</button>
     <button id="bDir" title="an unzipped CD folder">📁 Folder</button>
+    <select id="demo" title="author's own anonymized scans, streamed live - nothing downloaded whole">
+      <option value="">▶ Try a demo scan...</option>
+      <option value="ct">Demo: CT temporal bone (left SCDS)</option>
+      <option value="mri">Demo: MRI brain / base of skull</option>
+    </select>
     <span>|</span>
     <button id="tBrowse" class="on" title="drag/swipe to scroll slices (mouse wheel always scrolls)">Browse</button>
     <button id="tWL" title="drag: left-right = width, up-down = center">W/L</button>
@@ -64,6 +69,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
     <button id="bInvert">Invert</button>
     <button id="bTags" title="all DICOM tags of the current image">Tags</button>
     <select id="preset" title="CT window presets"></select>
+    <select id="lang" title="language" style="margin-left:auto"></select>
     <span id="stat"></span>
   </div>
   <div id="main">
@@ -72,6 +78,11 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
       <canvas id="cv"></canvas>
       <div class="ov" id="ovTL"></div><div class="ov" id="ovTR"></div>
       <div class="ov" id="ovBL"></div><div class="ov" id="ovBR"></div>
+      <div id="srcbadge" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);font:11px Tahoma,sans-serif;background:rgba(0,0,0,.55);color:#fff;padding:2px 8px;border-radius:9px;display:none;text-align:center;max-width:90%"></div>
+      <div id="busy" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.45);color:#fff;font:13px Tahoma,sans-serif;gap:8px">
+        <div id="busyTxt">Loading...</div>
+        <div style="width:60%;max-width:280px;height:8px;background:#333;border:1px solid #777"><div id="busyBar" style="height:100%;width:0;background:#4aa3ff;transition:width .15s"></div></div>
+      </div>
       <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
     </div>
   </div>
@@ -82,15 +93,81 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
     <span id="sliceLbl">-/-</span>
   </div>
   </div>
-  <div class="status-bar"><p class="status-bar-field">100% in-browser - your medical images are NEVER uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - not a medical device: for personal viewing, not diagnosis</p></div>
+  <div class="status-bar"><p class="status-bar-field"><span id="sbPrivacy">100% in-browser - your medical images are NEVER uploaded</span> (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - <span id="sbNotDevice">not a medical device: for personal viewing, not diagnosis</span></p></div>
 </div>
 <script src="./dicomParser.min.js"></script>
 <script type="module">
-import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut } from './logic.js';
+import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords } from './logic.js';
 import * as jpegLossless from './lossless-min.js';
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), vp = $('viewport'), ctx = cv.getContext('2d');
 const stat = (t) => { $('stat').textContent = t; };
+
+// ---- i18n (EN + natural Thai; Thai PACS keeps W/L, Zoom, Tags in English) ----
+const I18N = {
+  en: { open: 'Open (.zip / DICOM files)', folder: 'Folder', demoSelect: '▶ Try a demo scan...',
+    demoCT: 'Demo: CT temporal bone (left SCDS)', demoMRI: 'Demo: MRI brain / base of skull',
+    browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: '📏', reset: 'Reset', invert: 'Invert', tags: 'Tags',
+    browseHint: 'drag / swipe to scroll through slices; pinch or Zoom tool to zoom; double-tap to zoom',
+    emptyHint: 'Open your CT/MRI scan CD (.zip) or its folder - images stay on your device, nothing is uploaded.',
+    sourceLocal: 'local', sourceOnDevice: 'on your device', sourceRemote: 'streaming - nothing downloaded whole',
+    downloadFull: 'download the full CD (GPL)', fastest: 'For fastest scrolling,', andOpenLocally: 'and open it locally.',
+    loadingIndex: 'Reading scan index', parsing: 'Parsing index...', connecting: 'Connecting...',
+    readingArchive: 'Reading archive index...', buffering: 'Buffering slice', loadingSlice: 'Loading...',
+    notDevice: 'not a medical device: for personal viewing, not diagnosis',
+    privacy: '100% in-browser - your medical images are NEVER uploaded', langName: 'EN' },
+  th: { open: 'เปิด (.zip / ไฟล์ DICOM)', folder: 'โฟลเดอร์', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
+    demoCT: 'ตัวอย่าง: CT temporal bone (SCDS ข้างซ้าย)', demoMRI: 'ตัวอย่าง: MRI สมอง / ฐานกะโหลก',
+    browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: '📏', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
+    browseHint: 'ลาก / ปัดเพื่อไล่ดู slice; ใช้สองนิ้วหุบ-ถ่าง หรือเครื่องมือ Zoom เพื่อซูม; แตะสองครั้งเพื่อซูม',
+    emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ',
+    sourceLocal: 'local', sourceOnDevice: 'อยู่ในเครื่องคุณ', sourceRemote: 'สตรีม - ไม่ได้ดาวน์โหลดทั้งไฟล์',
+    downloadFull: 'ดาวน์โหลดทั้งแผ่น (GPL)', fastest: 'ถ้าอยากให้ไล่ดูภาพลื่นที่สุด', andOpenLocally: 'แล้วเปิดจากในเครื่อง',
+    loadingIndex: 'กำลังอ่านรายการภาพสแกน', parsing: 'กำลังแปลงรายการภาพ...', connecting: 'กำลังเชื่อมต่อ...',
+    readingArchive: 'กำลังอ่านรายการไฟล์...', buffering: 'กำลังโหลด slice', loadingSlice: 'กำลังโหลด...',
+    notDevice: 'ไม่ใช่เครื่องมือแพทย์: สำหรับดูส่วนตัว ไม่ใช้วินิจฉัย',
+    privacy: 'ทำงานในเบราว์เซอร์ของคุณ 100% - ภาพทางการแพทย์ของคุณไม่ถูกอัปโหลดออกไป', langName: 'ไทย' },
+};
+let T = I18N.en;
+function applyLang(code) {
+  T = I18N[code] || I18N.en;
+  document.documentElement.lang = code;
+  $('lang').value = code;
+  $('bZip').textContent = '📂 ' + T.open;
+  $('bDir').textContent = '📁 ' + T.folder;
+  const demo = $('demo'); demo.options[0].textContent = T.demoSelect; demo.options[1].textContent = T.demoCT; demo.options[2].textContent = T.demoMRI;
+  $('tBrowse').textContent = T.browse; $('tWL').textContent = T.wl; $('tPan').textContent = T.pan;
+  $('tZoom').textContent = T.zoom; $('tMeasure').textContent = T.measure; $('bReset').textContent = T.reset;
+  $('bInvert').textContent = T.invert; $('bTags').textContent = T.tags; $('tBrowse').title = T.browseHint;
+  $('sbPrivacy').textContent = T.privacy; $('sbNotDevice').textContent = T.notDevice;
+  if (!frame && !series.length) drawEmpty();
+  if (curSourceLabel) setSource(source, curSourceLabel, remoteUrl);
+}
+$('lang') && ($('lang').innerHTML = '<option value="en">EN</option><option value="th">ไทย</option>');
+function detectLang() {
+  const saved = localStorage.getItem('ce_lang'); if (saved && I18N[saved]) return saved;
+  return (navigator.languages || [navigator.language || 'en']).some((l) => l.toLowerCase().startsWith('th')) ? 'th' : 'en';
+}
+
+// loading/buffering indicator (frac 0..1, or null to hide)
+let bufferCb = null, source = 'local', curSourceLabel = null;
+function busy(txt, frac) {
+  const b = $('busy');
+  if (txt == null) { b.style.display = 'none'; return; }
+  b.style.display = 'flex'; $('busyTxt').textContent = txt;
+  $('busyBar').style.width = frac == null ? '100%' : `${Math.round(frac * 100)}%`;
+}
+let remoteUrl = null;
+function setSource(kind, label, url) {
+  source = kind; remoteUrl = url || null; curSourceLabel = label;
+  const b = $('srcbadge');
+  b.style.display = 'block';
+  if (kind === 'remote') {
+    b.innerHTML = `☁ ${label} - ${T.sourceRemote}. ${T.fastest} <a href="${url}" download style="color:#8fd0ff">${T.downloadFull}</a> ${T.andOpenLocally}`;
+  } else {
+    b.textContent = `◉ ${T.sourceLocal}: ${label} (${T.sourceOnDevice})`;
+  }
+}
 
 if (typeof DecompressionStream === 'undefined') stat('this browser lacks DecompressionStream - use a current Chrome/Edge/Firefox/Safari');
 
@@ -117,18 +194,108 @@ let items = [];        // [{name, usize, getBytes(headBytes?)}]
 let series = [], cur = null, idx = 0;
 
 async function openZip(file) {
+  setSource('local', file.name);
   const readRange = async (off, len) => new Uint8Array(await file.slice(off, off + len).arrayBuffer());
   const entries = await zipEntries(readRange, file.size);
-  items = entries.filter((e) => !JUNK_RE.test(e.name) && e.usize < 100 * 1048576)
-    .map((e) => ({ name: e.name, usize: e.usize, getBytes: (h) => zipData(readRange, e, inflateRaw, h) }));
-  await scan();
+  const all = entries.map((e) => ({ name: e.name, usize: e.usize, getBytes: (h) => zipData(readRange, e, inflateRaw, h) }));
+  await indexAndScan(all);
+}
+// stream a whole CD straight from a URL over HTTP Range - the CD stays on the
+// server, we pull only the DICOMDIR index + the slices you actually look at.
+// (Same idea as reading a huge file through a tiny buffer on the Siemens SL45
+// KVM for the 2003 Bangkok bus pathfinder - index first, then read only what
+// the current view needs.)
+async function openUrl(url, label) {
+  setSource('remote', label || 'remote CD', url);
+  busy(T.connecting, 0);
+  const h = await fetch(url, { method: 'HEAD' });
+  if (!h.ok) { busy(null); throw new Error(`cannot reach the file (HTTP ${h.status})`); }
+  const size = +h.headers.get('content-length');
+  if (!size) { busy(null); throw new Error('server did not report a size'); }
+  // one range read; for big reads (the DICOMDIR index) stream and report %
+  const readRange = async (off, len) => {
+    const r = await fetch(url, { headers: { Range: `bytes=${off}-${off + len - 1}` } });
+    if (r.status !== 206) throw new Error(`server ignored Range request (HTTP ${r.status}) - cannot stream`);
+    if (len > 1048576 && r.body && bufferCb) {
+      const reader = r.body.getReader(); const chunks = []; let got = 0;
+      for (;;) { const { value, done } = await reader.read(); if (done) break; chunks.push(value); got += value.length; bufferCb(got / len); }
+      const out = new Uint8Array(got); let o = 0; for (const c of chunks) { out.set(c, o); o += c.length; }
+      return out;
+    }
+    return new Uint8Array(await r.arrayBuffer());
+  };
+  busy(T.readingArchive, null);
+  const entries = await zipEntries(readRange, size);
+  const all = entries.map((e) => ({ name: e.name, usize: e.usize, getBytes: (b) => zipData(readRange, e, inflateRaw, b) }));
+  await indexAndScan(all);
 }
 async function openFiles(files) {
-  items = [...files].filter((f) => !JUNK_RE.test(f.webkitRelativePath || f.name) && f.size < 100 * 1048576 && f.size > 0)
-    .map((f) => ({ name: f.webkitRelativePath || f.name, usize: f.size,
-      getBytes: async (h) => new Uint8Array(await (h ? f.slice(0, h) : f).arrayBuffer()) }));
+  const root = (files[0] && files[0].webkitRelativePath || '').split('/')[0];
+  setSource('local', root ? `${root}/ folder` : `${files.length} files`);
+  const all = [...files].filter((f) => f.size > 0).map((f) => ({ name: f.webkitRelativePath || f.name, usize: f.size,
+    getBytes: async (b) => new Uint8Array(await (b ? f.slice(0, b) : f).arrayBuffer()) }));
+  await indexAndScan(all);
+}
+
+// index-first: if the CD has a DICOMDIR, read that one file for the whole
+// series/image tree; otherwise fall back to reading every file's header.
+async function indexAndScan(all) {
+  const dd = all.find((e) => /(^|\/)DICOMDIR$/i.test(e.name));
+  const byName = new Map(all.map((e) => [e.name.replace(/\\/g, '/').replace(/^\//, '').toUpperCase(), e]));
+  if (dd) {
+    try { return await scanFromDicomdir(dd, byName); }
+    catch (e) { stat(`DICOMDIR unreadable (${e.message}), scanning files...`); }
+  }
+  items = all.filter((e) => !JUNK_RE.test(e.name) && e.usize < 200 * 1048576);
   await scan();
 }
+
+async function scanFromDicomdir(dd, byName) {
+  busy(`${T.loadingIndex} (${(dd.usize / 1048576).toFixed(0)} MB)...`, 0);
+  bufferCb = (f) => busy(`${T.loadingIndex}... ${Math.round(f * 100)}%`, f);
+  const ddBytes = await dd.getBytes();
+  bufferCb = null;
+  busy(T.parsing, null);
+  const ds = dicomParser.parseDicom(ddBytes);
+  const seq = ds.elements.x00041220;
+  if (!seq || !seq.items) throw new Error('no directory records');
+  // flatten DICOMDIR records into the plain shape the pure helper expects
+  const records = seq.items.map((it) => {
+    const r = it.dataSet;
+    return {
+      type: (r.string('x00041430') || '').trim(),
+      seriesUID: r.string('x0020000e'), seriesNum: parseFloat(r.string('x00200011')),
+      modality: r.string('x00080060'), fid: r.string('x00041500'), instance: parseFloat(r.string('x00200013')),
+    };
+  });
+  const metas = seriesFromDicomdirRecords(records, (k) => byName.get(k));
+  if (!metas.length) throw new Error('no image records matched files');
+  series = groupSeries(metas);
+  busy(null);
+  stat(`${series.length} series, ${metas.length} images (from index)${source === 'remote' ? ' - streaming, nothing downloaded whole' : ''}`);
+  if (source === 'remote') stat(`${series.length} series, ${metas.length} images (streaming). For fastest scrolling, download the whole CD and open it locally.`);
+  renderSeriesList();
+  fillDescriptions();
+  selectSeries(series[0]);
+}
+async function fillDescriptions() {
+  let banner = false;
+  for (const s of series) {
+    try {
+      const ds = parseHead(await s.instances[0].item.getBytes(65536));
+      if (!ds) continue;
+      s.desc = ds.string('x0008103e') || s.desc;
+      if (s.el) s.el.querySelector('.lbl').innerHTML = `<b>S${s.num ?? '?'} ${s.modality}</b><br>${(s.desc || '').slice(0, 40)}<br>${s.instances.length} img`;
+      if (!banner) { banner = true; patientBanner(dsMeta(ds, s.instances[0].name)); }
+    } catch {}
+  }
+}
+function patientBanner(m) {
+  bannerMeta = m;
+  $('titleText').textContent = `🩻 ${m.patient ?? 'DICOM'} - DICOM Viewer`;
+  if (frame) render();
+}
+let bannerMeta = null;
 
 function dsMeta(ds, name) {
   const num = (t) => { const v = ds.string(t); return v == null ? null : parseFloat(v); };
@@ -166,8 +333,7 @@ async function scan() {
   if (!metas.length) { stat('no DICOM images found - is this a DICOM CD zip/folder?'); return; }
   series = groupSeries(metas);
   stat(`${series.length} series, ${metas.length} images - nothing was uploaded`);
-  const pat = metas[0];
-  $('titleText').textContent = `🩻 ${pat.patient ?? 'DICOM'} - DICOM Viewer`;
+  patientBanner(metas[0]);
   renderSeriesList();
   selectSeries(series[0]);
 }
@@ -276,7 +442,11 @@ async function show(i) {
   $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${cur.instances.length}`;
   try {
     let fr = cache.get(idx);
-    if (!fr) { stat('loading...'); fr = await decodeInstance(cur.instances[idx]); cachePut(idx, fr); stat(''); }
+    if (!fr) {
+      if (source === 'remote') busy(`${T.buffering} ${idx + 1}/${cur.instances.length}...`, null);
+      fr = await decodeInstance(cur.instances[idx]); cachePut(idx, fr);
+      busy(null);
+    }
     frame = fr;
     if (needWL) { wc = fr.wc0; ww = fr.ww0; needWL = false; }
     if (presetSel.value !== '0') { const p = CT_PRESETS[+presetSel.value]; wc = p.wc; ww = p.ww; }
@@ -290,10 +460,18 @@ async function show(i) {
     }
   } catch (e) { stat(`cannot display: ${e.message}`); }
 }
+function wrapText(ctx, text, x, y, maxW, lh) {
+  const words = text.split(' '); let line = '';
+  for (const w of words) {
+    if (ctx.measureText(line + w + ' ').width > maxW && line) { ctx.fillText(line, x, y); line = ''; y += lh; }
+    line += w + ' ';
+  }
+  ctx.fillText(line, x, y);
+}
 function drawEmpty() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
   ctx.fillStyle = '#888'; ctx.font = '13px Tahoma';
-  ctx.fillText('Open your DICOM CD (.zip) or its unzipped folder - images stay on this device.', 20, 40);
+  wrapText(ctx, T.emptyHint, 20, 40, cv.width - 40, 18);
 }
 function render() {
   const w = vp.clientWidth, h = vp.clientHeight;
@@ -319,7 +497,7 @@ function render() {
       ctx.fillText(label, (P[0][0] + P[1][0]) / 2 + 6, (P[0][1] + P[1][1]) / 2 - 6);
     }
   }
-  const p = cur.instances[0];
+  const p = bannerMeta || {};
   $('ovTL').textContent = [p.patient, p.pid && `ID: ${p.pid}`, p.dob && `DOB: ${p.dob}`, p.sex].filter(Boolean).join('\n');
   $('ovTR').textContent = [p.institution, p.study, p.studyDate].filter(Boolean).join('\n');
   $('ovBL').textContent = `S${cur.num ?? '?'} ${cur.modality} ${cur.desc}\nimg ${idx + 1}/${cur.instances.length}  ${frame.cols}x${frame.rows}`;
@@ -355,6 +533,16 @@ document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) openAny(e.dataTransfer.files); });
 $('bDir').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.webkitdirectory = true;
   i.onchange = async () => { if (i.files.length) { try { await openFiles(i.files); } catch (e) { stat(e.message); } } }; i.click(); };
+const DEMOS = {
+  ct: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_ct_demo.zip', label: 'demo CT' },
+  mri: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_mri_demo.zip', label: 'demo MRI' },
+};
+$('demo').onchange = async () => {
+  const d = DEMOS[$('demo').value];
+  if (!d) return;
+  try { await openUrl(d.url, d.label); }
+  catch (e) { stat(`demo failed: ${e.message}`); }
+};
 const TOOLS = [['tBrowse', 'browse'], ['tWL', 'wl'], ['tPan', 'pan'], ['tZoom', 'zoom'], ['tMeasure', 'measure']];
 for (const [id, t] of TOOLS) {
   $(id).onclick = () => { tool = t; for (const [id2, t2] of TOOLS) $(id2).classList.toggle('on', t2 === tool); };
@@ -432,18 +620,13 @@ vp.addEventListener('pointermove', (e) => {
   }
 });
 vp.addEventListener('dblclick', () => { zoom = 1; panX = panY = 0; render(); });
+$('lang').onchange = () => { localStorage.setItem('ce_lang', $('lang').value); applyLang($('lang').value); };
+applyLang(detectLang());
 drawEmpty();
 // test/demo hook: #load=<same-origin zip url>
 if (location.hash.startsWith('#load=')) {
-  (async () => {
-    try {
-      const u = location.hash.slice(6);
-      stat('fetching ' + u + '...');
-      const r = await fetch(u);
-      const b = await r.blob();
-      await openZip(new File([b], u.split('/').pop()));
-    } catch (e) { stat('load failed: ' + e.message); }
-  })();
+  const u = location.hash.slice(6);
+  openUrl(u, u.split('/').pop()).catch((e) => stat('load failed: ' + e.message));
 }
 </script>
 <script>/* zoom persisted per tool family */

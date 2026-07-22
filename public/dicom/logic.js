@@ -91,6 +91,26 @@ export function firstNum(s) {
   return Number.isFinite(v) ? v : null;
 }
 
+// normalize a DICOMDIR Referenced File ID / zip path to one comparable key
+export function normKey(name) { return name.replace(/\\/g, '/').replace(/^\//, '').toUpperCase(); }
+
+// build per-image metadata from DICOMDIR directory records (pure).
+// records: [{type:'SERIES'|'IMAGE'|..., seriesUID, seriesNum, modality, fid, instance}]
+// resolve: (normKey) -> source item, or undefined if that file isn't present.
+export function seriesFromDicomdirRecords(records, resolve) {
+  const metas = []; let curS = null;
+  for (const r of records) {
+    if (r.type === 'SERIES') curS = r;
+    else if (r.type === 'IMAGE' && curS && r.fid) {
+      const item = resolve(normKey(r.fid));
+      if (!item) continue;
+      metas.push({ name: item.name, item, seriesUID: curS.seriesUID || 'unknown',
+        seriesNum: curS.seriesNum, modality: curS.modality || '', seriesDesc: '', instance: r.instance });
+    }
+  }
+  return metas;
+}
+
 // map stored pixel values to 0..255 through rescale + window
 export function makeLut(slope, intercept, wc, ww, invert) {
   const w = Math.max(1, ww);
