@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convert GIS files online - SHP to GeoJSON, KML, GPX converter in your browser (no upload)</title>
+<meta name="description" content="Free online GIS format converter powered by GDAL ogr2ogr compiled to WebAssembly: Shapefile, GeoJSON, GPX, KML, GeoPackage, CSV, DXF, FlatGeobuf - converted 100% in your browser, your data is never uploaded. Optional reprojection to any EPSG.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🌍</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/geo/">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1e1e1e">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e}
+.toolbar{background:#333;border-bottom:1px solid #555;padding:6px;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.toolbar button,.toolbar select,.toolbar input{font:inherit;font-size:13px;background:#444;color:#eee;border:1px solid #666;padding:3px 8px}
+.toolbar button:hover{background:#555;cursor:pointer}
+.toolbar button:disabled{opacity:.5;cursor:default}
+#log{flex:1;overflow-y:auto;font-size:13px;line-height:1.4;padding:8px;white-space:pre-wrap}
+#log .err{color:#ff6b6b}
+#log .ok{color:#9ece6a}
+#log .warn{color:#ffb86c}
+.statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px}
+a{color:#7aa2f7}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="toolbar">
+    <button id="bOpen">📂 Choose input file(s)</button>
+    <span>→</span>
+    <select id="outFmt"></select>
+    <input id="tSrs" placeholder="reproject (optional): EPSG:4326" style="width:230px" title="target CRS passed as ogr2ogr -t_srs; leave empty to keep the source CRS">
+    <button id="bConvert" disabled>Convert &amp; download</button>
+  </div>
+  <div id="log">GIS vector format converter - GDAL ogr2ogr compiled to WebAssembly, runs 100% in your browser (your data is never uploaded).
+
+Input: anything ogr2ogr reads - Shapefile (select .shp + .dbf + .shx + .prj together), GeoJSON, GPX, KML/KMZ, GeoPackage, DXF, CSV, MapInfo, FlatGeobuf, GML...
+Output: GeoJSON, GPX, KML, GeoPackage, CSV, SQLite, DXF, FlatGeobuf. Optional reprojection to any EPSG code.
+
+Choose input file(s) to begin. First use downloads the converter engine (~40 MB, cached after).
+</div>
+  <div class="statusbar">powered by <a href="https://github.com/bugra9/gdal3.js" target="_blank" rel="noopener">gdal3.js</a> (GDAL/ogr2ogr in WebAssembly) - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+</div>
+<script src="./gdal3.js"></script>
+<script type="module">
+import { OUT_FORMATS, sizeCheck, buildArgs, outName, shpHint } from './logic.js';
+const $ = (id) => document.getElementById(id);
+const log = $('log');
+function say(t, cls) { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+$('outFmt').innerHTML = OUT_FORMATS.map((f, i) => `<option value="${i}">to ${f.label} (.${f.ext})</option>`).join('');
+
+let files = null, gdal = null;
+if (typeof WebAssembly === 'undefined') say('This browser has no WebAssembly - the converter cannot run here.', 'err');
+
+$('bOpen').onclick = () => {
+  const i = document.createElement('input');
+  i.type = 'file'; i.multiple = true;
+  i.onchange = () => {
+    if (!i.files.length) return;
+    files = [...i.files];
+    const total = files.reduce((s, f) => s + f.size, 0);
+    const chk = sizeCheck(total);
+    if (typeof chk === 'string') { say(chk, 'err'); files = null; $('bConvert').disabled = true; return; }
+    if (chk?.warn) say(chk.warn, 'warn');
+    const hint = shpHint(files.map((f) => f.name));
+    if (hint) say(hint, 'warn');
+    say(`input: ${files.map((f) => f.name).join(', ')} (${(total / 1048576).toFixed(2)} MB)`);
+    $('bConvert').disabled = false;
+  };
+  i.click();
+};
+
+$('bConvert').onclick = async () => {
+  $('bConvert').disabled = true;
+  try {
+    if (!gdal) {
+      say('loading converter engine (~40 MB, one-time)...');
+      gdal = await initGdalJs({ path: '.', useWorker: false });
+      say('engine ready', 'ok');
+    }
+    const fmt = OUT_FORMATS[+$('outFmt').value];
+    const res = await gdal.open(files);
+    if (!res.datasets.length) throw new Error('no dataset recognized in the input');
+    const ds = res.datasets[0];
+    if (res.datasets.length > 1) say(`note: ${res.datasets.length} datasets found, converting the first`, 'warn');
+    const info = await gdal.getInfo(ds);
+    say(`detected: ${ds.info?.driverLongName ?? info?.driverLongName ?? 'ok'}${info?.layers ? `, ${info.layers.length} layer(s)` : ''}`);
+    const out = await gdal.ogr2ogr(ds, buildArgs(fmt.drv, $('tSrs').value));
+    const bytes = await gdal.getFileBytes(out);
+    await gdal.close(ds);
+    const name = outName(files[0].name, fmt.ext);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes]));
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    say(`done: ${name} (${(bytes.length / 1048576).toFixed(2)} MB) downloaded`, 'ok');
+  } catch (e) {
+    // gdal errors land here instead of killing the tab
+    say(`conversion failed: ${e.message || e}`, 'err');
+    say('tip: GPX output needs point/line data with GPX-compatible layer names; try GeoJSON or GPKG to inspect the data first.');
+  }
+  $('bConvert').disabled = false;
+};
+</script>
+</body>
+</html>

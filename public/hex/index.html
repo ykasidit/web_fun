@@ -7,6 +7,8 @@
 <meta name="description" content="Free online hex viewer and editor: open any file, edit bytes in place, search by hex sequence, text, or a BIT sequence at any bit offset (bless-style, across octet boundaries), and save the edited file. 100% client-side - the file never leaves your machine.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔢</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/hex/">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
@@ -122,7 +124,15 @@ $('bOpen').onclick = () => {
   i.onchange = async () => {
     const f = i.files[0];
     if (!f) return;
-    ed = createEdit(new Uint8Array(await f.arrayBuffer()));
+    // pre-check before arrayBuffer(): a whole-file Uint8Array is the design here
+    if (f.size > 1024 * 1048576) { msg(`file is ${(f.size / 1048576).toFixed(0)} MB - the in-browser editor is limited to 1024 MB (whole file loads into memory)`); return; }
+    if (f.size > 256 * 1048576) msg(`large file (${(f.size / 1048576).toFixed(0)} MB) - loading, may take a moment...`);
+    try {
+      ed = createEdit(new Uint8Array(await f.arrayBuffer()));
+    } catch (e) {
+      msg(`could not load file: ${e.message} (likely out of browser memory - try a smaller file)`);
+      return;
+    }
     fileName = f.name; sel = -1; page = 0; hit = { start: -1, len: 0, bit: -1 };
     $('stName').textContent = `${f.name} (${ed.bytes.length} bytes)`;
     msg(''); render(); grid.focus();

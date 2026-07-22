@@ -138,3 +138,41 @@ test('hex: number search parse/type/encode', () => {
   assert.deepEqual([...numToBytes(-2n, 'i16', false)], [0xFF, 0xFE]);
   assert.equal(bitsToNumber('101100111'), 359n);
 });
+
+// ---------- geo ----------
+import { sizeCheck as geoSize, buildArgs as geoArgs, outName as geoOut, shpHint } from '../public/geo/logic.js';
+test('geo: size check, args, names', () => {
+  assert.equal(geoSize(1048576), null);
+  assert.ok(geoSize(150 * 1048576).warn);
+  assert.match(geoSize(400 * 1048576), /limit/);
+  assert.deepEqual(geoArgs('GPX', ' EPSG:4326 '), ['-f', 'GPX', '-t_srs', 'EPSG:4326']);
+  assert.deepEqual(geoArgs('KML', ''), ['-f', 'KML']);
+  assert.equal(geoOut('track.shp', 'geojson'), 'track.geojson');
+  assert.match(shpHint(['a.SHP']), /dbf/);
+  assert.equal(shpHint(['a.shp', 'a.dbf']), null);
+});
+
+// ---------- qr ----------
+import { wifiEscape, wifiPayload, buildPayload, capacityCheck } from '../public/qr/logic.js';
+test('qr: payloads and capacity', () => {
+  assert.equal(wifiEscape('a;b:c"d\\e,f'), 'a\\;b\\:c\\"d\\\\e\\,f');
+  assert.equal(wifiPayload('MyNet', 'p;w', 'WPA', false), 'WIFI:T:WPA;S:MyNet;P:p\\;w;;');
+  assert.equal(wifiPayload('Open', '', 'nopass', true), 'WIFI:T:nopass;S:Open;H:true;;');
+  assert.match(buildPayload('vcard', { name: 'A B', phone: '1', email: 'a@b.c', org: '' }), /BEGIN:VCARD[\s\S]*TEL:1/);
+  assert.equal(buildPayload('tel', { text: ' 123 ' }), 'tel:123');
+  assert.equal(capacityCheck('x'.repeat(100), 'M'), null);
+  assert.match(capacityCheck('x'.repeat(3000), 'M'), /max/);
+});
+
+// ---------- audio ----------
+import { sizeCheck as auSize, buildArgs as auArgs, outName as auOut, OUT_FORMATS as AU } from '../public/audio/logic.js';
+test('audio: size check, args, names', () => {
+  assert.equal(auSize(1048576), null);
+  assert.ok(auSize(200 * 1048576).warn);
+  assert.match(auSize(600 * 1048576), /limited/);
+  assert.match(auSize(300 * 1048576, 1), /working memory/);
+  const mp3 = AU.find((f) => f.ext === 'mp3');
+  assert.deepEqual(auArgs('in.mp4', mp3, 'out.mp3'), ['-i', 'in.mp4', '-vn', '-c:a', 'libmp3lame', '-q:a', '2', 'out.mp3']);
+  assert.equal(auOut('video.mp4', 'mp3'), 'video.mp3');
+  assert.equal(auOut('song.mp3', 'mp3'), 'song_converted.mp3');
+});

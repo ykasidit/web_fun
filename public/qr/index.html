@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Static QR Code Generator - free, never expires, no redirect, no sign-up (100% in your browser)</title>
+<meta name="description" content="Free static QR code generator that runs 100% in your browser: your URL or text is encoded directly into the QR - no redirect through anyone's server, so it never expires and can't be paywalled later. WiFi, vCard, URL, text. PNG and SVG download. Works offline.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔳</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/qr/">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1e1e1e">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e;overflow-y:auto}
+.pad{padding:12px;max-width:720px}
+h1{font-size:16px;margin:0 0 4px}
+.pledge{color:#9ece6a;font-size:12px;margin-bottom:10px}
+label{display:block;margin:8px 0 2px;font-size:13px}
+input,select,textarea,button{font:inherit;font-size:13px;background:#444;color:#eee;border:1px solid #666;padding:4px 8px}
+input,textarea{width:100%;max-width:420px;box-sizing:border-box}
+textarea{height:70px}
+button{cursor:pointer;margin-right:6px}
+button:hover{background:#555}
+#out{margin-top:14px}
+#qrcanvas{background:#fff;padding:12px;image-rendering:pixelated}
+#err{color:#ff6b6b;font-size:13px;margin-top:8px;white-space:pre-wrap}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px;margin-top:auto}
+a{color:#7aa2f7}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="frame">
+<div class="pad">
+  <h1>🔳 Static QR code generator</h1>
+  <div class="pledge">Your data is encoded <b>directly into the QR</b>, generated 100% in your browser. No redirect through anyone's server, no sign-up - so it <b>never expires</b> and can never be held hostage behind a subscription. Scanners go straight to your content.</div>
+
+  <label>Type
+  <select id="qtype">
+    <option value="url">URL</option>
+    <option value="text">Plain text</option>
+    <option value="wifi">WiFi network</option>
+    <option value="vcard">Contact (vCard)</option>
+    <option value="tel">Phone number</option>
+    <option value="mailto">Email address</option>
+  </select></label>
+
+  <div id="fSimple"><label id="simpleLabel">URL</label><textarea id="text" placeholder="https://example.com"></textarea></div>
+  <div id="fWifi" class="hidden">
+    <label>Network name (SSID)</label><input id="ssid">
+    <label>Password</label><input id="pass">
+    <div class="row"><label style="margin:0">Security <select id="auth"><option value="WPA" selected>WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass">Open (no password)</option></select></label>
+    <label style="margin:0"><input type="checkbox" id="hiddenNet" style="width:auto"> hidden network</label></div>
+  </div>
+  <div id="fVcard" class="hidden">
+    <label>Full name</label><input id="vname">
+    <label>Phone</label><input id="vphone">
+    <label>Email</label><input id="vemail">
+    <label>Organization (optional)</label><input id="vorg">
+  </div>
+
+  <div class="row">
+    <label style="margin:0">Error correction <select id="ec" title="higher = more damage-resistant but denser"><option>L</option><option selected>M</option><option>Q</option><option>H</option></select></label>
+    <label style="margin:0">Size <select id="scale"><option value="4">small</option><option value="8" selected>medium</option><option value="16">large</option></select></label>
+    <button id="bGen">Generate</button>
+  </div>
+
+  <div id="out" class="hidden">
+    <canvas id="qrcanvas"></canvas>
+    <div class="row">
+      <button id="bPng">Download PNG</button>
+      <button id="bSvg">Download SVG</button>
+    </div>
+  </div>
+  <div id="err"></div>
+</div>
+<div class="statusbar">static QR only - this site never sees or stores what you encode - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+</div>
+<script src="./qrcode.js"></script>
+<script type="module">
+import { buildPayload, capacityCheck } from './logic.js';
+const $ = (id) => document.getElementById(id);
+let lastQr = null;
+
+$('qtype').onchange = () => {
+  const t = $('qtype').value;
+  $('fSimple').classList.toggle('hidden', t === 'wifi' || t === 'vcard');
+  $('fWifi').classList.toggle('hidden', t !== 'wifi');
+  $('fVcard').classList.toggle('hidden', t !== 'vcard');
+  $('simpleLabel').textContent = { url: 'URL', text: 'Text', tel: 'Phone number', mailto: 'Email address' }[t] ?? 'Text';
+};
+
+$('bGen').onclick = () => {
+  $('err').textContent = '';
+  try {
+    const payload = buildPayload($('qtype').value, {
+      text: $('text').value, ssid: $('ssid').value, pass: $('pass').value,
+      auth: $('auth').value, hidden: $('hiddenNet').checked,
+      name: $('vname').value, phone: $('vphone').value, email: $('vemail').value, org: $('vorg').value,
+    });
+    if (!payload.trim()) { $('err').textContent = 'nothing to encode'; return; }
+    const ec = $('ec').value;
+    const cap = capacityCheck(payload, ec);
+    if (cap) { $('err').textContent = cap; return; }
+    const qr = qrcode(0, ec); // 0 = auto version
+    qr.addData(payload, 'Byte');
+    qr.make();
+    lastQr = qr;
+    const n = qr.getModuleCount(), scale = +$('scale').value, quiet = 4;
+    const px = (n + quiet * 2) * scale;
+    const c = $('qrcanvas'); c.width = px; c.height = px;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
+    ctx.fillStyle = '#000';
+    for (let r = 0; r < n; r++) for (let col = 0; col < n; col++) {
+      if (qr.isDark(r, col)) ctx.fillRect((col + quiet) * scale, (r + quiet) * scale, scale, scale);
+    }
+    $('out').classList.remove('hidden');
+  } catch (e) {
+    $('err').textContent = `could not generate: ${e.message || e}`;
+  }
+};
+$('bPng').onclick = () => {
+  const a = document.createElement('a');
+  a.href = $('qrcanvas').toDataURL('image/png');
+  a.download = 'qr.png'; a.click();
+};
+$('bSvg').onclick = () => {
+  if (!lastQr) return;
+  const svg = lastQr.createSvgTag({ scalable: true, margin: 4 });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+  a.download = 'qr.svg'; a.click();
+  URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>

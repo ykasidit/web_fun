@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extract & Convert Audio online - MP4 to MP3, M4A, WAV, FLAC in your browser (no upload)</title>
+<meta name="description" content="Free audio converter that runs 100% in your browser via ffmpeg compiled to WebAssembly: extract audio from video (MP4 to MP3), convert voice memos and recordings between MP3, WAV, FLAC, OGG, Opus, M4A. Your files are never uploaded - private by design.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🎵</text></svg>">
+<link rel="canonical" href="https://www.clearevo.com/audio/">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1e1e1e">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
+<style>
+html,body{height:100%;margin:0;background:#2b2b2b;color:#ddd;font-family:'DejaVu Sans Mono','Courier New',monospace}
+.frame{display:flex;flex-direction:column;position:absolute;inset:6px;border:1px solid #555;background:#1e1e1e}
+.toolbar{background:#333;border-bottom:1px solid #555;padding:6px;font-size:13px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.toolbar button,.toolbar select{font:inherit;font-size:13px;background:#444;color:#eee;border:1px solid #666;padding:3px 8px}
+.toolbar button:hover{background:#555;cursor:pointer}
+.toolbar button:disabled{opacity:.5;cursor:default}
+#log{flex:1;overflow-y:auto;font-size:12px;line-height:1.4;padding:8px;white-space:pre-wrap;color:#999}
+#log .err{color:#ff6b6b}
+#log .ok{color:#9ece6a}
+#log .warn{color:#ffb86c}
+#log .info{color:#ddd}
+#prog{height:4px;background:#333}
+#progFill{height:100%;width:0;background:#9ece6a;transition:width .3s}
+.statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px}
+a{color:#7aa2f7}
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="toolbar">
+    <button id="bOpen">📂 Choose audio/video file</button>
+    <span>→</span>
+    <select id="outFmt"></select>
+    <button id="bConvert" disabled>Convert &amp; download</button>
+  </div>
+  <div id="prog"><div id="progFill"></div></div>
+  <div id="log"><span class="info">Audio extractor &amp; converter - ffmpeg compiled to WebAssembly, runs 100% in your browser (your files are never uploaded).
+
+Extract the audio track from a video (MP4/MOV/MKV → MP3...), or convert recordings and voice memos between MP3, WAV, FLAC, OGG, Opus and M4A.
+
+Honest limits: in-browser conversion is ~10-20x slower than desktop ffmpeg and capped at 500 MB input - fine for audio and short clips, wrong tool for movies.
+
+Choose a file to begin. First use downloads the converter engine (~31 MB, cached after).</span>
+</div>
+  <div class="statusbar">powered by <a href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noopener">ffmpeg.wasm</a> - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+</div>
+<script src="./ffmpeg.js"></script>
+<script type="module">
+import { OUT_FORMATS, sizeCheck, buildArgs, outName } from './logic.js';
+const $ = (id) => document.getElementById(id);
+const log = $('log');
+function say(t, cls) { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; log.appendChild(d); log.scrollTop = log.scrollHeight; }
+$('outFmt').innerHTML = OUT_FORMATS.map((f, i) => `<option value="${i}">to ${f.label} (.${f.ext})</option>`).join('');
+
+let file = null, ff = null;
+if (typeof WebAssembly === 'undefined') say('This browser has no WebAssembly - the converter cannot run here.', 'err');
+
+$('bOpen').onclick = () => {
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = 'audio/*,video/*';
+  i.onchange = () => {
+    if (!i.files[0]) return;
+    const f = i.files[0];
+    const chk = sizeCheck(f.size, navigator.deviceMemory);
+    if (typeof chk === 'string') { say(chk, 'err'); file = null; $('bConvert').disabled = true; return; }
+    if (chk?.warn) say(chk.warn, 'warn');
+    file = f;
+    say(`input: ${f.name} (${(f.size / 1048576).toFixed(2)} MB)`, 'info');
+    $('bConvert').disabled = false;
+  };
+  i.click();
+};
+
+$('bConvert').onclick = async () => {
+  $('bConvert').disabled = true;
+  const inName = 'in_' + file.name.replace(/[^\w.-]/g, '_');
+  try {
+    if (!ff) {
+      say('loading converter engine (~31 MB, one-time)...', 'info');
+      ff = new FFmpegWASM.FFmpeg();
+      ff.on('log', ({ message }) => say(message));
+      ff.on('progress', ({ progress }) => { $('progFill').style.width = `${Math.min(100, progress * 100).toFixed(0)}%`; });
+      await ff.load({ coreURL: new URL('./ffmpeg-core.js', location.href).href, wasmURL: new URL('./ffmpeg-core.wasm', location.href).href });
+      say('engine ready', 'ok');
+    }
+    const fmt = OUT_FORMATS[+$('outFmt').value];
+    const out = outName(file.name, fmt.ext);
+    say(`reading ${file.name} into memory...`, 'info');
+    await ff.writeFile(inName, new Uint8Array(await file.arrayBuffer()));
+    say(`converting to ${fmt.label}...`, 'info');
+    const rc = await ff.exec(buildArgs(inName, fmt, out));
+    if (rc !== 0) throw new Error(`ffmpeg exited with code ${rc} - see log above (no audio track? unsupported codec?)`);
+    const data = await ff.readFile(out);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([data.buffer]));
+    a.download = out;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    say(`done: ${out} (${(data.length / 1048576).toFixed(2)} MB) downloaded`, 'ok');
+    await ff.deleteFile(inName).catch(() => {});
+    await ff.deleteFile(out).catch(() => {});
+  } catch (e) {
+    // OOM / codec / abort errors land here instead of killing the tab
+    say(`conversion failed: ${e.message || e}`, 'err');
+    say('if this was a big file, the browser may have hit its WebAssembly memory limit - try a smaller file or desktop ffmpeg.', 'warn');
+    try { await ff?.deleteFile(inName); } catch {}
+  }
+  $('progFill').style.width = '0';
+  $('bConvert').disabled = false;
+};
+</script>
+</body>
+</html>
