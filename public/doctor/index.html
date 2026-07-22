@@ -16,7 +16,9 @@ html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono'
 .menubar{background:#d6d0c8;border-bottom:1px solid #888;padding:2px 4px;font-size:13px;user-select:none}
 .menubar button{font:inherit;border:none;background:none;padding:1px 7px;cursor:pointer}
 .menubar button:hover{background:#316ac5;color:#fff}
-#buf{flex:1;overflow-y:auto;padding:6px 8px;font-size:14px;white-space:pre-wrap;word-break:break-word}
+#buf{flex:1;overflow-y:auto;padding:6px 8px;font-size:14px;white-space:pre-wrap;word-break:break-word;user-select:none;cursor:default}
+#toast{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:6px 14px;border-radius:4px;font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
+#toast.show{opacity:.92}
 #buf .me{color:#1565c0}
 .modeline{background:#000;color:#fff;font-size:12px;padding:1px 8px;user-select:none}
 .mini{display:flex;border-top:1px solid #888;font-size:14px}
@@ -36,6 +38,7 @@ html,body{height:100%;margin:0;background:#bdbdbd;font-family:'DejaVu Sans Mono'
   <div class="modeline">-UU-:----F1  *doctor*      All L1     (Doctor Fill)  -- RET to send - this is a parody, not therapy or medical anything</div>
   <div class="mini"><span class="prompt">&gt;</span><input id="inp" autocomplete="off" autofocus></div>
 </div>
+<div id="toast"></div>
 <script type="module">
 import { createDoctor, doctorReply, GREETING } from './logic.js';
 const buf = document.getElementById('buf'), inp = document.getElementById('inp');
@@ -74,6 +77,16 @@ let mx = false;
 document.addEventListener('keydown', (e) => {
   if (e.altKey && e.key === 'x') { mx = true; e.preventDefault(); return; }
   if (mx && e.key === 'Enter') { mx = false; restart(); }
+});
+// the transcript is not an input - tapping it refocuses the real input with a hint
+const toast = document.getElementById('toast');
+let toastTimer = 0;
+buf.addEventListener('click', () => {
+  inp.focus();
+  toast.textContent = 'Type your question below, then press Enter twice to send';
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
 });
 document.getElementById('mSend').onclick = send;
 document.getElementById('mRestart').onclick = restart;
