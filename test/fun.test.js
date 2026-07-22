@@ -176,3 +176,39 @@ test('audio: size check, args, names', () => {
   assert.equal(auOut('video.mp4', 'mp3'), 'video.mp3');
   assert.equal(auOut('song.mp3', 'mp3'), 'song_converted.mp3');
 });
+
+import { kmzExtractKml } from '../public/geo/logic.js';
+import zlib from 'node:zlib';
+function makeZip(entries) { // [{name, data(Buffer), method}]
+  const parts = [], cd = [];
+  let off = 0;
+  for (const e of entries) {
+    const stored = e.method === 8 ? zlib.deflateRawSync(e.data) : e.data;
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(e.method, 8);
+    lh.writeUInt32LE(stored.length, 18); lh.writeUInt32LE(e.data.length, 22);
+    lh.writeUInt16LE(e.name.length, 26);
+    parts.push(lh, Buffer.from(e.name), stored);
+    const c = Buffer.alloc(46);
+    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(e.method, 10);
+    c.writeUInt32LE(stored.length, 20); c.writeUInt32LE(e.data.length, 24);
+    c.writeUInt16LE(e.name.length, 28); c.writeUInt32LE(off, 42);
+    cd.push(Buffer.concat([c, Buffer.from(e.name)]));
+    off += 30 + e.name.length + stored.length;
+  }
+  const cdBuf = Buffer.concat(cd);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(cdBuf.length, 12); eocd.writeUInt32LE(off, 16);
+  return new Uint8Array(Buffer.concat([...parts.flat(), cdBuf, eocd]));
+}
+const nodeInflate = async (u8) => new Uint8Array(zlib.inflateRawSync(u8));
+test('geo: kmz extraction, stored and deflated', async () => {
+  const kml = Buffer.from('<kml>hello</kml>');
+  const zStored = makeZip([{ name: 'img.png', data: Buffer.from('x'), method: 0 }, { name: 'doc.kml', data: kml, method: 0 }]);
+  assert.equal(Buffer.from(await kmzExtractKml(zStored, nodeInflate)).toString(), '<kml>hello</kml>');
+  const zDeflate = makeZip([{ name: 'doc.KML', data: kml, method: 8 }]);
+  assert.equal(Buffer.from(await kmzExtractKml(zDeflate, nodeInflate)).toString(), '<kml>hello</kml>');
+  await assert.rejects(() => kmzExtractKml(new Uint8Array([1, 2, 3]), nodeInflate), /not a valid/);
+  await assert.rejects(() => kmzExtractKml(makeZip([{ name: 'a.txt', data: kml, method: 0 }]), nodeInflate), /no \.kml/);
+});

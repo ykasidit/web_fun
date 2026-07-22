@@ -36,6 +36,39 @@ export function outName(inputName, ext) {
   return inputName.replace(/\.[^.]+$/, '') + '.' + ext;
 }
 
+// minimal ZIP reader for KMZ: return the first .kml entry's bytes.
+// inflateRaw(Uint8Array) -> Promise<Uint8Array> is injected (browser:
+// DecompressionStream('deflate-raw'), tests: node zlib). ZIP64 not supported.
+export async function kmzExtractKml(bytes, inflateRaw) {
+  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('not a valid KMZ/ZIP file');
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) throw new Error('bad ZIP central directory');
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true);
+    const extraLen = dv.getUint16(off + 30, true);
+    const cmtLen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    const name = new TextDecoder().decode(bytes.subarray(off + 46, off + 46 + nameLen));
+    if (name.toLowerCase().endsWith('.kml')) {
+      const dataOff = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+      const data = bytes.subarray(dataOff, dataOff + csize);
+      if (method === 0) return data;
+      if (method === 8) return inflateRaw(data);
+      throw new Error(`unsupported ZIP compression method ${method}`);
+    }
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  throw new Error('no .kml found inside the KMZ');
+}
+
 // quick sanity hint for shapefile inputs
 export function shpHint(names) {
   const lower = names.map((n) => n.toLowerCase());

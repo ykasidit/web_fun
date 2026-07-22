@@ -39,7 +39,7 @@ a{color:#7aa2f7}
   </div>
   <div id="log">GIS vector format converter - GDAL ogr2ogr compiled to WebAssembly, runs 100% in your browser (your data is never uploaded).
 
-Input: the common vector formats ogr2ogr reads - Shapefile (select .shp + .dbf + .shx + .prj together), GeoJSON, GPX, KML, GeoPackage, DXF, CSV, MapInfo, FlatGeobuf, GML...
+Input: the common vector formats ogr2ogr reads - Shapefile (select .shp + .dbf + .shx + .prj together), GeoJSON, GPX, KML/KMZ (KMZ is unzipped right in the page), GeoPackage, DXF, CSV, MapInfo, FlatGeobuf, GML...
 Output: GeoJSON, GPX, KML, GeoPackage, CSV, SQLite, DXF, FlatGeobuf. Optional reprojection to any EPSG code.
 
 Choose input file(s) to begin. First use downloads the converter engine (~21 MB, cached after).
@@ -48,7 +48,7 @@ Choose input file(s) to begin. First use downloads the converter engine (~21 MB,
 </div>
 <script src="./gdal3.js"></script>
 <script type="module">
-import { OUT_FORMATS, sizeCheck, buildArgs, outName, shpHint } from './logic.js';
+import { OUT_FORMATS, sizeCheck, buildArgs, outName, shpHint, kmzExtractKml } from './logic.js';
 const $ = (id) => document.getElementById(id);
 const log = $('log');
 function say(t, cls) { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; log.appendChild(d); log.scrollTop = log.scrollHeight; }
@@ -68,9 +68,21 @@ async function gunzipToBlobUrl(url) {
 $('bOpen').onclick = () => {
   const i = document.createElement('input');
   i.type = 'file'; i.multiple = true;
-  i.onchange = () => {
+  i.onchange = async () => {
     if (!i.files.length) return;
     files = [...i.files];
+    // KMZ = zipped KML; the wasm build has no libkml, so unzip in-page first
+    const inflateRaw = async (u8) => new Uint8Array(await new Response(
+      new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+    for (let k = 0; k < files.length; k++) {
+      if (files[k].name.toLowerCase().endsWith('.kmz')) {
+        try {
+          const kml = await kmzExtractKml(new Uint8Array(await files[k].arrayBuffer()), inflateRaw);
+          files[k] = new File([kml], files[k].name.replace(/\.kmz$/i, '.kml'));
+          say(`${i.files[k].name}: extracted ${files[k].name} from KMZ`);
+        } catch (e) { say(`${files[k].name}: ${e.message}`, 'err'); files = null; $('bConvert').disabled = true; return; }
+      }
+    }
     const total = files.reduce((s, f) => s + f.size, 0);
     const chk = sizeCheck(total);
     if (typeof chk === 'string') { say(chk, 'err'); files = null; $('bConvert').disabled = true; return; }
