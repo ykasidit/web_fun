@@ -24,7 +24,7 @@ body,button,select,input,textarea,label{font-family:Tahoma,'Segoe UI','DejaVu Sa
 h1{font-size:14px;margin:0 0 4px;font-family:inherit}
 .pledge{color:#080;font-size:11px;margin-bottom:10px}
 label{display:block;margin:8px 0 2px}
-input,textarea{width:100%;max-width:420px;box-sizing:border-box}
+input,textarea{width:100%;max-width:min(420px,100%);box-sizing:border-box}
 textarea{height:70px}
 button{margin-right:6px}
 #out{margin-top:14px}
@@ -35,6 +35,8 @@ button{margin-right:6px}
 .hidden{display:none}
 </style>
 <style>/* font size controls (top right) */
+.title-bar-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.title-bar-controls{flex:0 0 auto;display:flex}
 .title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
 </style>
 </head>
