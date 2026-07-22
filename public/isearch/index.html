@@ -1,9 +1,15 @@
 <!DOCTYPE html>
+<!--
+  ClearEvo.com iSearch
+  Copyright (C) 2026 Kasidit Yusuf
+  Free software under the GNU General Public License v2 (see LICENSE); NO WARRANTY.
+  https://www.clearevo.com/
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>almost Emacs isearch - incremental text search in your browser (C-s / C-r)</title>
+<title>ClearEvo.com iSearch - Emacs incremental text search in your browser</title>
 <meta name="description" content="Paste or open a text file and search it Emacs-style: C-s incremental search forward, C-r backward, smart case folding, wrap-around with authentic Failing/Wrapped/Overwrapped messages, match counts, easy copy out. 100% client-side.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔍</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/isearch/">
@@ -34,7 +40,7 @@ mark.cur{background:#316ac5;color:#fff}
 </head>
 <body>
 <div class="window" id="app">
-  <div class="title-bar"><div class="title-bar-text">🔍 isearch (almost Emacs) - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="title-bar"><div class="title-bar-text">🔍 ClearEvo.com iSearch</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
   <div class="window-body">
   <div class="menubar">
     <button id="bOpen">Open file...</button>
@@ -49,7 +55,7 @@ mark.cur{background:#316ac5;color:#fff}
   <div class="modeline" id="modeline">-UU-:----F1  *isearch-scratch*      All L1     (Text) -- C-s search forward, C-r backward, RET done, C-g cancel</div>
   <div id="echo"></div>
   </div>
-  <div class="status-bar"><p class="status-bar-field">an 'almost' Emacs isearch - smart case, wraps around - 100% in-browser, your text is never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_isearch_text_files_emacs_style_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
+  <div class="status-bar"><p class="status-bar-field">an 'almost' Emacs isearch - smart case, wraps around - 100% in-browser, your text is never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_isearch_text_files_emacs_style_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a> - © 2026 Kasidit Yusuf, GPL v2</p></div>
 </div>
 <script type="module">
 import { createSearch, findAll, extend, repeat, echoLine, countLabel } from './logic.js';

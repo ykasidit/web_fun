@@ -1,9 +1,15 @@
 <!DOCTYPE html>
+<!--
+  ClearEvo.com MRI/CT CD Viewer
+  Copyright (C) 2026 Kasidit Yusuf
+  Free software under the GNU General Public License v2 (see LICENSE); NO WARRANTY.
+  https://www.clearevo.com/
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Online MRI/CT CD Viewer - open your DICOM scan CD in the browser, no upload | ClearEvo</title>
+<title>ClearEvo.com MRI/CT CD Viewer - open or stream your DICOM scan CD in the browser, no upload</title>
 <meta name="description" content="Free online MRI/CT CD viewer: open or stream the DICOM CD from your MRI or CT scan right in your browser, on PC and phone - series list, slice scrolling, window/level, measure, tags. 100% client-side, your medical images are never uploaded. A DICOM viewer with no install and no sign-up.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩻</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/dicom/">
@@ -49,7 +55,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
 </head>
 <body>
 <div class="window" id="app">
-  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 Online MRI/CT CD Viewer - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 ClearEvo.com MRI/CT CD Viewer</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
   <div class="window-body">
   <div class="toolbar">
     <button id="bZip">📂 Open (.zip / DICOM files)</button>
@@ -69,6 +75,12 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
     <button id="bInvert">Invert</button>
     <button id="bTags" title="all DICOM tags of the current image">Tags</button>
     <select id="preset" title="CT window presets"></select>
+    <select id="buf" title="how many slices to buffer ahead while scrolling">
+      <option value="5">buffer 5</option>
+      <option value="10" selected>buffer 10</option>
+      <option value="50">buffer 50</option>
+      <option value="100">buffer 100</option>
+    </select>
     <select id="lang" title="language" style="margin-left:auto"></select>
     <span id="stat"></span>
   </div>
@@ -93,7 +105,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
     <span id="sliceLbl">-/-</span>
   </div>
   </div>
-  <div class="status-bar"><p class="status-bar-field"><span id="sbPrivacy">100% in-browser - your medical images are NEVER uploaded</span> (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - <span id="sbNotDevice">not a medical device: for personal viewing, not diagnosis</span></p></div>
+  <div class="status-bar"><p class="status-bar-field"><span id="sbPrivacy">100% in-browser - your medical images are NEVER uploaded</span> (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - © 2026 Kasidit Yusuf, GPL v2 - <span id="sbNotDevice">not a medical device: for personal viewing, not diagnosis</span></p></div>
 </div>
 <script src="./dicomParser.min.js"></script>
 <script type="module">
@@ -163,7 +175,9 @@ function setSource(kind, label, url) {
   const b = $('srcbadge');
   b.style.display = 'block';
   if (kind === 'remote') {
-    b.innerHTML = `☁ ${label} - ${T.sourceRemote}. ${T.fastest} <a href="${url}" download style="color:#8fd0ff">${T.downloadFull}</a> ${T.andOpenLocally}`;
+    // cross-origin R2 URL: the download attribute is ignored, so open in a new
+    // tab - R2 serves application/zip and the browser downloads it
+    b.innerHTML = `☁ ${label} - ${T.sourceRemote}. ${T.fastest} <a href="${url}" target="_blank" rel="noopener" style="color:#8fd0ff">${T.downloadFull}</a> ${T.andOpenLocally}`;
   } else {
     b.textContent = `◉ ${T.sourceLocal}: ${label} (${T.sourceOnDevice})`;
   }
@@ -295,7 +309,7 @@ async function fillDescriptions() {
 }
 function patientBanner(m) {
   bannerMeta = m;
-  $('titleText').textContent = `🩻 ${m.patient ?? 'Online MRI/CT CD Viewer'} - ClearEvo`;
+  $('titleText').textContent = `🩻 ${m.patient ?? 'ClearEvo.com MRI/CT CD Viewer'}`;
   if (frame) render();
 }
 let bannerMeta = null;
@@ -429,18 +443,57 @@ function paint(fr, wc, ww, invert) {
 // ---- viewer state ----
 let frame = null, wc = 0, ww = 1, invert = false, zoom = 1, panX = 0, panY = 0, tool = 'browse', needWL = true;
 let measure = [], lastTf = null, lastTap = 0;
+// ---- slice cache + rolling prefetch buffer ----
+// Like map-tile prefetch: keep `prefetchN` slices buffered AHEAD in the scroll
+// direction (a couple behind too). Fetches run concurrently (capped) and each
+// completion tops the buffer back up, so scrolling stays smooth instead of
+// blocking one Range request per frame.
 const cache = new Map(); // idx -> frame
-function cachePut(k, v) { cache.set(k, v); if (cache.size > 16) cache.delete(cache.keys().next().value); }
+const inflight = new Set();
+let prefetchN = 10, lastDir = 1;
+const CONCURRENCY = 4;
+function cacheCap() { return Math.max(24, prefetchN * 2 + 4); }
+function cachePut(k, v) {
+  cache.set(k, v);
+  while (cache.size > cacheCap()) {
+    // evict the buffered slice farthest from the current view
+    let far = null, fd = -1;
+    for (const key of cache.keys()) { const d = Math.abs(key - idx); if (d > fd) { fd = d; far = key; } }
+    if (far === idx || far === null) break;
+    cache.delete(far);
+  }
+}
+function ensurePrefetch() {
+  if (!cur) return;
+  const n = cur.instances.length;
+  // ahead in the scroll direction
+  for (let k = 1; k <= prefetchN && inflight.size < CONCURRENCY; k++) {
+    const j = idx + k * lastDir;
+    if (j < 0 || j >= n || cache.has(j) || inflight.has(j)) continue;
+    inflight.add(j);
+    decodeInstance(cur.instances[j]).then((f) => cachePut(j, f)).catch(() => {})
+      .finally(() => { inflight.delete(j); ensurePrefetch(); });
+  }
+  // one behind, for comfortable scroll-back
+  const b = idx - lastDir;
+  if (inflight.size < CONCURRENCY && b >= 0 && b < n && !cache.has(b) && !inflight.has(b)) {
+    inflight.add(b);
+    decodeInstance(cur.instances[b]).then((f) => cachePut(b, f)).catch(() => {})
+      .finally(() => { inflight.delete(b); });
+  }
+}
 
 async function selectSeries(s) {
-  cur = s; idx = 0; cache.clear(); zoom = 1; panX = panY = 0; invert = false; needWL = true;
+  cur = s; idx = 0; cache.clear(); inflight.clear(); zoom = 1; panX = panY = 0; invert = false; needWL = true; lastDir = 1;
   series.forEach((x) => x.el && x.el.classList.toggle('on', x === s));
   $('slice').max = s.instances.length - 1; $('slice').value = 0;
   await show(0);
 }
 async function show(i) {
   if (!cur) return;
-  idx = Math.max(0, Math.min(cur.instances.length - 1, i));
+  const target = Math.max(0, Math.min(cur.instances.length - 1, i));
+  if (target !== idx) lastDir = target > idx ? 1 : -1;
+  idx = target;
   measure = [];
   $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${cur.instances.length}`;
   try {
@@ -454,13 +507,7 @@ async function show(i) {
     if (needWL) { wc = fr.wc0; ww = fr.ww0; needWL = false; }
     if (presetSel.value !== '0') { const p = CT_PRESETS[+presetSel.value]; wc = p.wc; ww = p.ww; }
     render();
-    // prefetch neighbours quietly
-    for (const j of [idx + 1, idx - 1]) {
-      if (j >= 0 && j < cur.instances.length && !cache.has(j)) {
-        decodeInstance(cur.instances[j]).then((f) => cachePut(j, f)).catch(() => {});
-        break;
-      }
-    }
+    ensurePrefetch(); // keep the buffer topped up ahead of you
   } catch (e) { stat(`cannot display: ${e.message}`); }
 }
 function wrapText(ctx, text, x, y, maxW, lh) {
@@ -623,6 +670,8 @@ vp.addEventListener('pointermove', (e) => {
   }
 });
 vp.addEventListener('dblclick', () => { zoom = 1; panX = panY = 0; render(); });
+$('buf').value = String(prefetchN);
+$('buf').onchange = () => { prefetchN = +$('buf').value; ensurePrefetch(); };
 $('lang').onchange = () => { localStorage.setItem('ce_lang', $('lang').value); applyLang($('lang').value); };
 applyLang(detectLang());
 drawEmpty();

@@ -1,9 +1,15 @@
 <!DOCTYPE html>
+<!--
+  ClearEvo.com Audio Converter
+  Copyright (C) 2026 Kasidit Yusuf
+  Free software under the GNU General Public License v2 (see LICENSE); NO WARRANTY.
+  https://www.clearevo.com/
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Extract & Convert Audio online - MP4 to MP3, M4A, WAV, FLAC in your browser (no upload)</title>
+<title>ClearEvo.com Audio Converter - extract and convert audio online in your browser (ffmpeg)</title>
 <meta name="description" content="Free audio converter that runs 100% in your browser via ffmpeg compiled to WebAssembly: extract audio from video (MP4 to MP3), convert voice memos and recordings between MP3, WAV, FLAC, OGG, Opus, M4A. Your files are never uploaded - private by design.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🎵</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/audio/">
@@ -35,7 +41,7 @@ body,button,select,input,textarea,label{font-family:Tahoma,'Segoe UI','DejaVu Sa
 </head>
 <body>
 <div class="window" id="app">
-  <div class="title-bar"><div class="title-bar-text">🎵 Audio Converter (ffmpeg) - ClearEvo</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="title-bar"><div class="title-bar-text">🎵 ClearEvo.com Audio Converter</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
   <div class="window-body">
   <div class="toolbar">
     <button id="bOpen">📂 Choose audio/video file</button>
@@ -53,7 +59,7 @@ Honest limits: in-browser conversion is ~10-20x slower than desktop ffmpeg and c
 Choose a file to begin. First use downloads the converter engine (~10 MB, cached after).</span>
 </div>
   </div>
-  <div class="status-bar"><p class="status-bar-field">powered by <a href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noopener">ffmpeg.wasm</a> - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_extract_audio_from_video_and_convert_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></p></div>
+  <div class="status-bar"><p class="status-bar-field">powered by <a href="https://github.com/ffmpegwasm/ffmpeg.wasm" target="_blank" rel="noopener">ffmpeg.wasm</a> - 100% in-browser, files never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_extract_audio_from_video_and_convert_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - © 2026 Kasidit Yusuf, GPL v2</p></div>
 </div>
 <script src="./ffmpeg.js"></script>
 <script type="module">

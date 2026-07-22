@@ -1,27 +1,54 @@
-# clearevo fun tools
+# ClearEvo online tools
 
-Eight small in-browser tools, one directory each under `public/`, deployed on [www.clearevo.com](https://www.clearevo.com/tools/) - live link on each tool below:
+Free, privacy-respecting tools that run **100% in your browser** - nothing is uploaded.
+Live at **https://www.clearevo.com/tools/**
 
-- **[/dicom](public/dicom)** - DICOM viewer for CT/MRI scan CDs (zip / folder / streamed over HTTP Range): reads the CD's DICOMDIR index then pulls only the slices you view, so a gigabyte CD opens on a phone reading a few MB. Series browser, window/level, pan/zoom/measure/tags, JPEG-lossless + baseline decode, EN/ไทย, photo-app touch. 100% client-side ([dicom-parser](https://github.com/cornerstonejs/dicomParser) + [jpeg-lossless-decoder-js](https://github.com/rii-mango/JPEGLosslessDecoderJS)) - [live](https://www.clearevo.com/dicom/)
-- **[/doctor](public/doctor)** - 'almost' Emacs `M-x doctor` (ELIZA psychotherapist, RET-twice submit) - [live](https://www.clearevo.com/doctor/)
-- **[/calc](public/calc)** - 'almost' Emacs `M-x calc` (RPN stack, *Calc Trail* pane, RET dup / TAB swap / n / & / Q / U undo) - [live](https://www.clearevo.com/calc/)
-- **[/isearch](public/isearch)** - 'almost' Emacs isearch over pasted/opened text (C-s / C-r, smart case, authentic Failing/Wrapped messages) - [live](https://www.clearevo.com/isearch/)
-- **[/hex](public/hex)** - ClearEvo hex viewer/editor: edit bytes, search hex/text/numbers (u8..i64, LE/BE)/**bit sequences at any bit offset** (bless-style), save edited file - [live](https://www.clearevo.com/hex/)
-- **[/geo](public/geo)** - GIS vector format converter: GDAL `ogr2ogr` via [gdal3.js](https://github.com/bugra9/gdal3.js) (WebAssembly), optional EPSG reprojection - [live](https://www.clearevo.com/geo/)
-- **[/qr](public/qr)** - static QR code generator (the QR carries the real link/text as entered - never expires, no redirect), UI in 12 languages, PNG/SVG export - [live](https://www.clearevo.com/qr/)
-- **[/audio](public/audio)** - audio extractor/converter via [ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm): MP4→MP3, MP3/WAV/FLAC/OGG/Opus/M4A - [live](https://www.clearevo.com/audio/)
+Copyright (C) 2026 Kasidit Yusuf. Free software under the **GNU GPL v2** (see [`LICENSE`](LICENSE)).
 
-All 100% client-side. `./test.sh` runs the engine tests; `./push.sh` deploys the whole site.
+## Structure - one app per subdirectory
 
-## Demo scans (DICOM viewer)
+Each tool is a self-contained app under `public/<app>/`, with its own `index.html`
+(inline UI), a pure, tested `logic.js`, a `manifest.json` + icons (PWA-pinnable), and
+a per-app `README.md` carrying the copyright/licence notice:
 
-The DICOM viewer's demo cases are the **author's own CT and MRI scans**, anonymized
-(patient tags replaced), which show a left superior semicircular canal dehiscence
-(SCDS). Kasidit Yusuf releases these anonymized scans under **GPL v2** - free to use for
-testing, development, teaching and demos. Each demo streams live from the site or can be
-downloaded as a full CD zip (with `LICENSE.txt` inside). Not a medical record for anyone
-else; not for diagnosis.
+| App | Path | What it is |
+|-----|------|-----------|
+| 🩻 ClearEvo.com MRI/CT CD Viewer | [`public/dicom`](public/dicom) | Open/stream a DICOM CT/MRI scan CD in the browser |
+| 🔢 ClearEvo.com Hex Viewer/Editor | [`public/hex`](public/hex) | Hex view/edit + hex/text/number/bit search |
+| 🌍 ClearEvo.com GIS Converter | [`public/geo`](public/geo) | GDAL `ogr2ogr` (WebAssembly) format converter |
+| 🔳 ClearEvo.com QR Code Generator | [`public/qr`](public/qr) | Static QR that never expires, 12 languages |
+| 🎵 ClearEvo.com Audio Converter | [`public/audio`](public/audio) | ffmpeg.wasm audio extract/convert |
+| 🩺 ClearEvo.com Doctor | [`public/doctor`](public/doctor) | Emacs `M-x doctor` (ELIZA) |
+| 🧮 ClearEvo.com Calc | [`public/calc`](public/calc) | Emacs `M-x calc` RPN calculator |
+| 🔍 ClearEvo.com iSearch | [`public/isearch`](public/isearch) | Emacs incremental search |
 
-## License
+Sibling repos (their own build pipelines, deployed alongside these under the same
+site) hold the remaining ClearEvo online tools: [`web_gnss`](https://github.com/ykasidit/web_gnss)
+→ /gnss/, [`hyperterminal`](https://github.com/ykasidit/hyperterminal) → /hyperterminal/,
+[`web_at`](https://github.com/ykasidit/web_at) → /at/.
 
-GPL v2, like the [Bluetooth GNSS](https://github.com/ykasidit/bluetooth_gnss) app - see [LICENSE](LICENSE).
+## Build / test / deploy
+
+- `./build.sh` - content-hash build of every `public/<app>/` into `dist/<app>/`.
+- `./test.sh` - `node --test` over `test/` (pure-logic + streaming integration tests).
+- The whole site (these apps + the sibling tools + the Jekyll blog) is assembled and
+  deployed to Cloudflare by `../ykasidit.github.io/deploy.sh`.
+
+## Design standard (every app)
+
+Windows XP theme (xp.css window + title bar), A-/A+ font-size buttons top-right,
+PWA manifest + icons, an emoji favicon, and a status bar with the privacy note +
+"verify" link. See the app READMEs for details.
+
+## Copyright & license
+
+Copyright (C) 2026 Kasidit Yusuf.
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the **GNU General Public License, version 2**, as published by the Free
+Software Foundation - see [`LICENSE`](LICENSE). It is distributed in the hope that it
+will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+The MRI/CT CD Viewer's demo scans are the author's own CT/MRI, anonymized, and likewise
+released under GPL v2 (see [`public/dicom/README.md`](public/dicom)).
