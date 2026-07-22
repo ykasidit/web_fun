@@ -75,11 +75,10 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
     <button id="bInvert">Invert</button>
     <button id="bTags" title="all DICOM tags of the current image">Tags</button>
     <select id="preset" title="CT window presets"></select>
-    <select id="buf" title="how many slices to buffer ahead while scrolling">
-      <option value="5">buffer 5</option>
-      <option value="10" selected>buffer 10</option>
-      <option value="50">buffer 50</option>
-      <option value="100">buffer 100</option>
+    <select id="buf" title="how many slices to buffer ahead for smooth scrolling">
+      <option value="25">25 slices ahead</option>
+      <option value="50" selected>50 slices ahead</option>
+      <option value="100">100 slices ahead</option>
     </select>
     <select id="lang" title="language" style="margin-left:auto"></select>
     <span id="stat"></span>
@@ -94,6 +93,10 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
       <div id="busy" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.45);color:#fff;font:13px Tahoma,sans-serif;gap:8px">
         <div id="busyTxt">Loading...</div>
         <div style="width:60%;max-width:280px;height:8px;background:#333;border:1px solid #777"><div id="busyBar" style="height:100%;width:0;background:#4aa3ff;transition:width .15s"></div></div>
+      </div>
+      <div id="empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#9fb3c8;gap:12px;padding:24px;pointer-events:none">
+        <div style="font-size:72px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">🩻</div>
+        <div id="emptyTxt" style="font:14px Tahoma,'Segoe UI',sans-serif;max-width:520px;line-height:1.5"></div>
       </div>
       <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
     </div>
@@ -450,7 +453,7 @@ let measure = [], lastTf = null, lastTap = 0;
 // blocking one Range request per frame.
 const cache = new Map(); // idx -> frame
 const inflight = new Set();
-let prefetchN = 10, lastDir = 1;
+let prefetchN = 50, lastDir = 1;
 const CONCURRENCY = 4;
 function cacheCap() { return Math.max(24, prefetchN * 2 + 4); }
 function cachePut(k, v) {
@@ -519,15 +522,18 @@ function wrapText(ctx, text, x, y, maxW, lh) {
   ctx.fillText(line, x, y);
 }
 function drawEmpty() {
+  const w = vp.clientWidth, h = vp.clientHeight;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = '#888'; ctx.font = '13px Tahoma';
-  wrapText(ctx, T.emptyHint, 20, 40, cv.width - 40, 18);
+  $('emptyTxt').textContent = T.emptyHint;
+  $('empty').style.display = 'flex';
 }
 function render() {
   const w = vp.clientWidth, h = vp.clientHeight;
   if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   if (!frame) { drawEmpty(); return; }
+  $('empty').style.display = 'none';
   const off = frame.bitmap ?? paint(frame, wc, ww, invert);
   const base = Math.min(w / frame.cols, h / frame.rows) * zoom;
   const dw = frame.cols * base, dh = frame.rows * base;
@@ -672,6 +678,9 @@ vp.addEventListener('pointermove', (e) => {
 vp.addEventListener('dblclick', () => { zoom = 1; panX = panY = 0; render(); });
 $('buf').value = String(prefetchN);
 $('buf').onchange = () => { prefetchN = +$('buf').value; ensurePrefetch(); };
+// keep clicks/drags on the source badge (the "download full CD" link) from being
+// captured by the viewport's pointer handlers (which would scroll instead of click)
+['pointerdown', 'pointerup', 'pointermove', 'click'].forEach((ev) => $('srcbadge').addEventListener(ev, (e) => e.stopPropagation()));
 $('lang').onchange = () => { localStorage.setItem('ce_lang', $('lang').value); applyLang($('lang').value); };
 applyLang(detectLang());
 drawEmpty();
