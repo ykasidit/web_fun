@@ -40,9 +40,21 @@ a{color:#7aa2f7}
       <option value="hex">Hex seq</option>
       <option value="text">Text</option>
       <option value="bits">Bit seq (any bit offset)</option>
+      <option value="num">Number (octet-aligned)</option>
     </select>
     <input id="findText" placeholder="DE AD BE EF   /   hello   /   101100111">
+    <span id="numUI" style="display:none">
+      <select id="numType" title="Rust-style type; auto picks the smallest fit">
+        <option value="auto" selected>auto</option>
+        <option>u8</option><option>i8</option><option>u16</option><option>i16</option>
+        <option>u32</option><option>i32</option><option>u64</option><option>i64</option>
+      </select>
+      <select id="numEndian" title="byte order (only matters above 1 byte)">
+        <option value="le" selected>LE</option><option value="be">BE</option>
+      </select>
+    </span>
     <button id="bFind">Find next (Enter / C-s)</button>
+    <span id="preview" style="color:#9ece6a"></span>
     <span>|</span>
     <input id="goto" placeholder="goto offset (hex)" style="width:110px">
     <span style="margin-left:auto;font-size:11px">ClearEvo Hex - 100% in-browser, file never uploaded (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) -<a href="/blog/2026/07/22/how_to_view_edit_and_search_hex_files_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="https://www.clearevo.com/">clearevo</a></span>
@@ -50,8 +62,8 @@ a{color:#7aa2f7}
   <div id="grid" tabindex="0">
 open a file to begin -
 click a byte then type hex digits to overwrite it, arrows to move,
-search supports hex sequences, text, and bless-style BIT sequences that
-can match at any bit offset (not just octet-aligned)</div>
+search supports hex sequences, text, numbers (u8..i64, LE/BE, octet-aligned),
+and bless-style BIT sequences that can match at any bit offset</div>
   <div class="statusbar">
     <span id="stName">no file</span>
     <span id="stOff">offset: -</span>
@@ -61,7 +73,8 @@ can match at any bit offset (not just octet-aligned)</div>
   </div>
 </div>
 <script type="module">
-import { parseHexBytes, parseBitString, searchBytes, searchBits, toHex, rowData, offsetHex, createEdit, setByte } from './logic.js';
+import { parseHexBytes, parseBitString, searchBytes, searchBits, toHex, rowData, offsetHex, createEdit, setByte,
+  parseNumber, numFits, autoNumType, numToBytes, bitsToNumber } from './logic.js';
 const $ = (id) => document.getElementById(id);
 const grid = $('grid');
 const WIDTH = 16, PAGE_ROWS = 512; // ponytail: windowed paging, virtual scroll if huge files lag
@@ -123,11 +136,59 @@ $('bSave').onclick = () => {
   a.click();
   URL.revokeObjectURL(a.href);
 };
+// number query -> {type, bytes} or {err}
+function numSpec() {
+  const v = parseNumber($('findText').value);
+  if (v === null) return { err: 'bad number (dec or 0x hex, optional -)' };
+  const forced = $('numType').value;
+  const type = forced === 'auto' ? autoNumType(v) : (numFits(v, forced) ? forced : null);
+  if (!type) return { err: forced === 'auto' ? 'number needs more than 64 bits' : `doesn't fit ${forced}` };
+  return { type, bytes: numToBytes(v, type, $('numEndian').value === 'le') };
+}
+function preview() {
+  const mode = $('findMode').value, q = $('findText').value.trim(), pv = $('preview');
+  pv.textContent = '';
+  if (mode === 'bits' && q) {
+    const bits = parseBitString(q);
+    if (bits) pv.textContent = `= ${bitsToNumber(bits)} (0x${bitsToNumber(bits).toString(16).toUpperCase()}, ${bits.length} bits)`;
+  } else if (mode === 'num' && q) {
+    const s = numSpec();
+    pv.textContent = s.err ?? `${s.type}${s.bytes.length > 1 ? ' ' + $('numEndian').value.toUpperCase() : ''} = ${[...s.bytes].map(toHex).join(' ')}`;
+    $('numEndian').disabled = !s.err && s.bytes.length === 1;
+  }
+}
+function updateFindUI() {
+  const mode = $('findMode').value;
+  $('numUI').style.display = mode === 'num' ? '' : 'none';
+  $('findText').placeholder = mode === 'num' ? '1234   /   -42   /   0x1F4' : 'DE AD BE EF   /   hello   /   101100111';
+  preview();
+}
+$('findMode').onchange = updateFindUI;
+$('numEndian').onchange = preview;
+$('numType').onchange = () => {
+  // uN can't be negative: drop the minus instead of erroring
+  if ($('numType').value[0] === 'u' && $('findText').value.trim().startsWith('-')) {
+    $('findText').value = $('findText').value.trim().slice(1);
+  }
+  preview();
+};
+$('findText').addEventListener('input', preview);
+
 function doFind() {
   if (!ed) return;
   const q = $('findText').value.trim();
   const mode = $('findMode').value;
   const from = (hit.start >= 0 ? hit.start + 1 : (sel >= 0 ? sel : 0));
+  if (mode === 'num') {
+    const s = numSpec();
+    if (s.err) { msg(s.err); return; }
+    const r = searchBytes(ed.bytes, s.bytes, from);
+    if (r === -1) { msg(`${s.type} not found`); hit = { start: -1, len: 0, bit: -1 }; render(); return; }
+    hit = { start: r, len: s.bytes.length, bit: -1 };
+    msg(`${s.type} match at 0x${offsetHex(r)}${r < from ? ' (wrapped)' : ''}`);
+    select(r);
+    return;
+  }
   if (mode === 'bits') {
     const bits = parseBitString(q);
     if (!bits) { msg('bad bit string (use 0/1)'); return; }

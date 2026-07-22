@@ -122,3 +122,19 @@ test('hex: rowData formats a row', () => {
   assert.equal(r.ascii, 'A..');
   assert.equal(r.off, '00000000');
 });
+import { parseNumber, numFits, autoNumType, numToBytes, bitsToNumber } from '../public/hex/logic.js';
+test('hex: number search parse/type/encode', () => {
+  assert.equal(parseNumber('0x1F4'), 500n);
+  assert.equal(parseNumber('-42'), -42n);
+  assert.equal(parseNumber('12a'), null);
+  assert.equal(autoNumType(200n), 'u8');
+  assert.equal(autoNumType(-1n), 'i8');
+  assert.equal(autoNumType(70000n), 'u32');
+  assert.equal(autoNumType(1n << 64n), null);
+  assert.equal(numFits(256n, 'u8'), false);
+  assert.equal(numFits(-1n, 'u16'), false);
+  assert.deepEqual([...numToBytes(500n, 'u16', true)], [0xF4, 0x01]);
+  assert.deepEqual([...numToBytes(500n, 'u16', false)], [0x01, 0xF4]);
+  assert.deepEqual([...numToBytes(-2n, 'i16', false)], [0xFF, 0xFE]);
+  assert.equal(bitsToNumber('101100111'), 359n);
+});

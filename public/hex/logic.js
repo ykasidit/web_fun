@@ -50,6 +50,48 @@ export function searchBits(hay, bits, from = 0) {
   return tryFrom(startBit, total) ?? (from > 0 ? tryFrom(0, Math.min(total, startBit + n)) : null);
 }
 
+// ---- number search (octet-aligned; unaligned matching is the bit search's job) ----
+
+// "123", "-42", "0x1F4" -> BigInt or null
+export function parseNumber(str) {
+  const s = str.trim();
+  if (!/^-?(0x[0-9a-f]+|\d+)$/i.test(s)) return null;
+  const neg = s.startsWith('-');
+  const v = BigInt(neg ? s.slice(1) : s);
+  return neg ? -v : v;
+}
+
+export function numFits(v, type) {
+  const bits = BigInt(type.slice(1));
+  return type[0] === 'u'
+    ? v >= 0n && v < (1n << bits)
+    : v >= -(1n << (bits - 1n)) && v < (1n << (bits - 1n));
+}
+
+// smallest rust-ish type that fits; negative -> iN. null if beyond 64 bits.
+export function autoNumType(v) {
+  for (const t of v < 0n ? ['i8', 'i16', 'i32', 'i64'] : ['u8', 'u16', 'u32', 'u64']) {
+    if (numFits(v, t)) return t;
+  }
+  return null;
+}
+
+// two's-complement encode to bytes, little or big endian
+export function numToBytes(v, type, littleEndian) {
+  const bits = +type.slice(1);
+  let u = BigInt.asUintN(bits, v);
+  const out = new Uint8Array(bits / 8);
+  for (let i = 0; i < out.length; i++) { out[i] = Number(u & 0xffn); u >>= 8n; }
+  return littleEndian ? out : out.reverse();
+}
+
+// unsigned value of a '0101' bit string, MSB first - numeric preview for bit search
+export function bitsToNumber(bits) {
+  let v = 0n;
+  for (const c of bits) v = (v << 1n) | (c === '1' ? 1n : 0n);
+  return v;
+}
+
 export function toHex(b) { return b.toString(16).toUpperCase().padStart(2, '0'); }
 export function toAscii(b) { return b >= 32 && b < 127 ? String.fromCharCode(b) : '.'; }
 export function offsetHex(n, w = 8) { return n.toString(16).toUpperCase().padStart(w, '0'); }
