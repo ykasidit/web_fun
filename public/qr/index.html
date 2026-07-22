@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Static QR Code Generator - free, never expires, no redirect, no sign-up (100% in your browser)</title>
-<meta name="description" content="Free static QR code generator that runs 100% in your browser: your URL or text is encoded directly into the QR - no redirect through anyone's server, so it never expires and can't be paywalled later. WiFi, vCard, URL, text. PNG and SVG download. Works offline.">
+<meta name="description" content="Free static QR code generator that runs 100% in your browser: your URL or text is encoded directly into the QR - no redirect through anyone's server, so it never expires and can't be paywalled later. WiFi, vCard, URL, text. PNG and SVG download. Works offline. English, ไทย, 中文, Tiếng Việt, Bahasa, Filipino, မြန်မာ, ລາວ, ខ្មែរ, Español, Português.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🔳</text></svg>">
 <link rel="canonical" href="https://www.clearevo.com/qr/">
 <link rel="manifest" href="manifest.json">
@@ -26,9 +26,10 @@ textarea{height:70px}
 button{cursor:pointer;margin-right:6px}
 button:hover{background:#555}
 #out{margin-top:14px}
-#qrcanvas{background:#fff;padding:12px;image-rendering:pixelated}
+#qrcanvas{background:#fff;padding:12px;image-rendering:pixelated;max-width:100%}
 #err{color:#ff6b6b;font-size:13px;margin-top:8px;white-space:pre-wrap}
 .row{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.langrow{float:right}
 .statusbar{background:#333;border-top:1px solid #555;font-size:11px;padding:3px 8px;margin-top:auto}
 a{color:#7aa2f7}
 .hidden{display:none}
@@ -37,36 +38,37 @@ a{color:#7aa2f7}
 <body>
 <div class="frame">
 <div class="pad">
-  <h1>🔳 Static QR code generator</h1>
-  <div class="pledge">Your data is encoded <b>directly into the QR</b>, generated 100% in your browser. No redirect through anyone's server, no sign-up - so it <b>never expires</b> and can never be held hostage behind a subscription. Scanners go straight to your content.</div>
+  <select id="lang" class="langrow" title="language"></select>
+  <h1>🔳 <span id="tTitle">Static QR code generator</span></h1>
+  <div class="pledge" id="tPledge"></div>
 
-  <label>Type
+  <label><span id="tType">Type</span>
   <select id="qtype">
-    <option value="url">URL</option>
-    <option value="text">Plain text</option>
-    <option value="wifi">WiFi network</option>
-    <option value="vcard">Contact (vCard)</option>
-    <option value="tel">Phone number</option>
-    <option value="mailto">Email address</option>
+    <option value="url" id="oUrl">URL</option>
+    <option value="text" id="oText">Plain text</option>
+    <option value="wifi" id="oWifi">WiFi network</option>
+    <option value="vcard" id="oVcard">Contact (vCard)</option>
+    <option value="tel" id="oTel">Phone number</option>
+    <option value="mailto" id="oMailto">Email address</option>
   </select></label>
 
   <div id="fSimple"><label id="simpleLabel">URL</label><textarea id="text" placeholder="https://example.com"></textarea></div>
   <div id="fWifi" class="hidden">
-    <label>Network name (SSID)</label><input id="ssid">
-    <label>Password</label><input id="pass">
-    <div class="row"><label style="margin:0">Security <select id="auth"><option value="WPA" selected>WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass">Open (no password)</option></select></label>
-    <label style="margin:0"><input type="checkbox" id="hiddenNet" style="width:auto"> hidden network</label></div>
+    <label id="tSsid">Network name (SSID)</label><input id="ssid">
+    <label id="tPass">Password</label><input id="pass">
+    <div class="row"><label style="margin:0"><span id="tAuth">Security</span> <select id="auth"><option value="WPA" selected>WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass" id="oNopass">Open (no password)</option></select></label>
+    <label style="margin:0"><input type="checkbox" id="hiddenNet" style="width:auto"> <span id="tHidden">hidden network</span></label></div>
   </div>
   <div id="fVcard" class="hidden">
-    <label>Full name</label><input id="vname">
-    <label>Phone</label><input id="vphone">
-    <label>Email</label><input id="vemail">
-    <label>Organization (optional)</label><input id="vorg">
+    <label id="tName">Full name</label><input id="vname">
+    <label id="tPhone">Phone</label><input id="vphone">
+    <label id="tEmail">Email</label><input id="vemail">
+    <label id="tOrg">Organization (optional)</label><input id="vorg">
   </div>
 
   <div class="row">
-    <label style="margin:0">Error correction <select id="ec" title="higher = more damage-resistant but denser"><option>L</option><option selected>M</option><option>Q</option><option>H</option></select></label>
-    <label style="margin:0">Size <select id="scale"><option value="4">small</option><option value="8" selected>medium</option><option value="16">large</option></select></label>
+    <label style="margin:0"><span id="tEc">Error correction</span> <select id="ec" title="higher = more damage-resistant but denser"><option>L</option><option selected>M</option><option>Q</option><option>H</option></select></label>
+    <label style="margin:0"><span id="tSize">Size</span> <select id="scale"><option value="4" id="oSmall">small</option><option value="8" selected id="oMedium">medium</option><option value="16" id="oLarge">large</option></select></label>
     <button id="bGen">Generate</button>
   </div>
 
@@ -79,20 +81,64 @@ a{color:#7aa2f7}
   </div>
   <div id="err"></div>
 </div>
-<div class="statusbar">static QR only - this site never sees or stores what you encode - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
+<div class="statusbar">static QR only - this site never sees or stores what you encode - 100% in-browser (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_create_free_qr_codes_that_never_expire/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a></div>
 </div>
 <script src="./qrcode.js"></script>
 <script type="module">
 import { buildPayload, capacityCheck } from './logic.js';
 const $ = (id) => document.getElementById(id);
-let lastQr = null;
 
+// ---- i18n: EN + ASEAN + zh/es/pt. keys map to element ids. ----
+// order: tTitle,tPledge,tType,oUrl,oText,oWifi,oVcard,oTel,oMailto,tSsid,tPass,tAuth,oNopass,tHidden,tName,tPhone,tEmail,tOrg,tEc,tSize,oSmall,oMedium,oLarge,bGen,bPng,bSvg,errEmpty
+const L = (a) => Object.fromEntries(['tTitle','tPledge','tType','oUrl','oText','oWifi','oVcard','oTel','oMailto','tSsid','tPass','tAuth','oNopass','tHidden','tName','tPhone','tEmail','tOrg','tEc','tSize','oSmall','oMedium','oLarge','bGen','bPng','bSvg','errEmpty'].map((k, i) => [k, a[i]]));
+const I18N = {
+  en: L(['Static QR code generator', 'Your data is encoded directly into the QR, generated 100% in your browser. No redirect through anyone’s server, no sign-up - so it never expires and can never be held hostage behind a subscription. Scanners go straight to your content.', 'Type', 'URL', 'Plain text', 'WiFi network', 'Contact (vCard)', 'Phone number', 'Email address', 'Network name (SSID)', 'Password', 'Security', 'Open (no password)', 'hidden network', 'Full name', 'Phone', 'Email', 'Organization (optional)', 'Error correction', 'Size', 'small', 'medium', 'large', 'Generate', 'Download PNG', 'Download SVG', 'nothing to encode']),
+  th: L(['เครื่องมือสร้าง QR โค้ดแบบคงที่ (static)', 'ข้อมูลของคุณถูกเข้ารหัสลงใน QR โดยตรง และสร้างในเบราว์เซอร์ของคุณ 100% ไม่ผ่านเซิร์ฟเวอร์ของใคร ไม่ต้องสมัครสมาชิก - จึงไม่มีวันหมดอายุ และไม่มีใครบังคับเก็บค่ารายเดือนภายหลังได้ สแกนแล้วไปที่เนื้อหาของคุณโดยตรง', 'ประเภท', 'URL (ลิงก์)', 'ข้อความ', 'เครือข่าย WiFi', 'รายชื่อติดต่อ (vCard)', 'หมายเลขโทรศัพท์', 'อีเมล', 'ชื่อเครือข่าย (SSID)', 'รหัสผ่าน', 'ความปลอดภัย', 'เปิด (ไม่มีรหัสผ่าน)', 'เครือข่ายซ่อน', 'ชื่อ-นามสกุล', 'โทรศัพท์', 'อีเมล', 'องค์กร (ไม่บังคับ)', 'ระดับแก้ไขข้อผิดพลาด', 'ขนาด', 'เล็ก', 'กลาง', 'ใหญ่', 'สร้าง QR', 'ดาวน์โหลด PNG', 'ดาวน์โหลด SVG', 'ไม่มีข้อมูลให้เข้ารหัส']),
+  zh: L(['静态二维码生成器', '您的数据直接编码进二维码，100%在您的浏览器中生成。不经过任何服务器跳转，无需注册——因此永不过期，也不会被订阅费绑架。扫码直达您的内容。', '类型', '网址', '文本', 'WiFi网络', '联系人 (vCard)', '电话号码', '电子邮箱', '网络名称 (SSID)', '密码', '加密方式', '开放（无密码）', '隐藏网络', '姓名', '电话', '邮箱', '单位（可选）', '容错级别', '大小', '小', '中', '大', '生成', '下载 PNG', '下载 SVG', '没有可编码的内容']),
+  vi: L(['Trình tạo mã QR tĩnh', 'Dữ liệu của bạn được mã hóa trực tiếp vào mã QR, tạo 100% trong trình duyệt. Không chuyển hướng qua máy chủ nào, không cần đăng ký - nên không bao giờ hết hạn và không thể bị giữ làm "con tin" sau bức tường phí. Quét là đến thẳng nội dung của bạn.', 'Loại', 'URL', 'Văn bản', 'Mạng WiFi', 'Danh bạ (vCard)', 'Số điện thoại', 'Email', 'Tên mạng (SSID)', 'Mật khẩu', 'Bảo mật', 'Mở (không mật khẩu)', 'mạng ẩn', 'Họ tên', 'Điện thoại', 'Email', 'Tổ chức (tùy chọn)', 'Mức sửa lỗi', 'Kích thước', 'nhỏ', 'vừa', 'lớn', 'Tạo mã', 'Tải PNG', 'Tải SVG', 'không có gì để mã hóa']),
+  id: L(['Pembuat kode QR statis', 'Data Anda dikodekan langsung ke dalam QR, dibuat 100% di browser Anda. Tanpa pengalihan lewat server siapa pun, tanpa pendaftaran - jadi tidak pernah kedaluwarsa dan tidak bisa disandera di balik langganan. Pemindai langsung menuju konten Anda.', 'Jenis', 'URL', 'Teks', 'Jaringan WiFi', 'Kontak (vCard)', 'Nomor telepon', 'Email', 'Nama jaringan (SSID)', 'Kata sandi', 'Keamanan', 'Terbuka (tanpa sandi)', 'jaringan tersembunyi', 'Nama lengkap', 'Telepon', 'Email', 'Organisasi (opsional)', 'Koreksi kesalahan', 'Ukuran', 'kecil', 'sedang', 'besar', 'Buat QR', 'Unduh PNG', 'Unduh SVG', 'tidak ada yang dikodekan']),
+  ms: L(['Penjana kod QR statik', 'Data anda dikodkan terus ke dalam QR, dijana 100% dalam pelayar anda. Tiada lencongan melalui pelayan sesiapa, tiada pendaftaran - jadi ia tidak akan luput dan tidak boleh ditahan di sebalik langganan. Pengimbas terus ke kandungan anda.', 'Jenis', 'URL', 'Teks', 'Rangkaian WiFi', 'Kenalan (vCard)', 'Nombor telefon', 'E-mel', 'Nama rangkaian (SSID)', 'Kata laluan', 'Keselamatan', 'Terbuka (tanpa kata laluan)', 'rangkaian tersembunyi', 'Nama penuh', 'Telefon', 'E-mel', 'Organisasi (pilihan)', 'Pembetulan ralat', 'Saiz', 'kecil', 'sederhana', 'besar', 'Jana QR', 'Muat turun PNG', 'Muat turun SVG', 'tiada apa untuk dikodkan']),
+  fil: L(['Static QR code generator', 'Direktang naka-encode ang iyong data sa QR, 100% ginawa sa iyong browser. Walang redirect sa server ng iba, walang sign-up - kaya hindi ito mag-e-expire at hindi maipapa-hostage sa subscription. Diretso sa iyong content ang scanner.', 'Uri', 'URL', 'Teksto', 'WiFi network', 'Contact (vCard)', 'Numero ng telepono', 'Email', 'Pangalan ng network (SSID)', 'Password', 'Seguridad', 'Bukas (walang password)', 'nakatagong network', 'Buong pangalan', 'Telepono', 'Email', 'Organisasyon (opsyonal)', 'Error correction', 'Laki', 'maliit', 'katamtaman', 'malaki', 'Gumawa', 'I-download ang PNG', 'I-download ang SVG', 'walang ie-encode']),
+  my: L(['Static QR ကုဒ် ဖန်တီးကိရိယာ', 'သင့်အချက်အလက်ကို QR ထဲသို့ တိုက်ရိုက် ကုဒ်သွင်းပြီး သင့်ဘရောက်ဇာထဲတွင် ၁၀၀% ဖန်တီးသည်။ မည်သူ့ဆာဗာကိုမျှ မဖြတ်သန်း၊ အကောင့်မလို - ထို့ကြောင့် ဘယ်တော့မှ သက်တမ်းမကုန်ဘဲ နောက်ပိုင်း ငွေတောင်းခံခြင်း မခံရပါ။', 'အမျိုးအစား', 'URL (လင့်ခ်)', 'စာသား', 'WiFi ကွန်ရက်', 'အဆက်အသွယ် (vCard)', 'ဖုန်းနံပါတ်', 'အီးမေးလ်', 'ကွန်ရက်အမည် (SSID)', 'စကားဝှက်', 'လုံခြုံရေး', 'ဖွင့် (စကားဝှက်မရှိ)', 'ဝှက်ထားသောကွန်ရက်', 'အမည်အပြည့်အစုံ', 'ဖုန်း', 'အီးမေးလ်', 'အဖွဲ့အစည်း (ရွေးချယ်နိုင်)', 'အမှားပြင်ဆင်မှုအဆင့်', 'အရွယ်အစား', 'သေး', 'လတ်', 'ကြီး', 'ဖန်တီးမည်', 'PNG ဒေါင်းလုဒ်', 'SVG ဒေါင်းလုဒ်', 'ကုဒ်သွင်းရန် ဘာမှမရှိ']),
+  lo: L(['ເຄື່ອງສ້າງ QR ໂຄດແບບຄົງທີ່', 'ຂໍ້ມູນຂອງທ່ານຖືກເຂົ້າລະຫັດໂດຍກົງໃສ່ QR, ສ້າງ 100% ໃນບຣາວເຊີຂອງທ່ານ. ບໍ່ຜ່ານເຊີບເວີຂອງໃຜ, ບໍ່ຕ້ອງສະໝັກ - ຈຶ່ງບໍ່ໝົດອາຍຸຈັກເທື່ອ ແລະ ບໍ່ຖືກບັງຄັບເກັບຄ່າພາຍຫຼັງ.', 'ປະເພດ', 'URL (ລິ້ງ)', 'ຂໍ້ຄວາມ', 'ເຄືອຂ່າຍ WiFi', 'ລາຍຊື່ຕິດຕໍ່ (vCard)', 'ເບີໂທລະສັບ', 'ອີເມວ', 'ຊື່ເຄືອຂ່າຍ (SSID)', 'ລະຫັດຜ່ານ', 'ຄວາມປອດໄພ', 'ເປີດ (ບໍ່ມີລະຫັດ)', 'ເຄືອຂ່າຍເຊື່ອງ', 'ຊື່ເຕັມ', 'ໂທລະສັບ', 'ອີເມວ', 'ອົງກອນ (ທາງເລືອກ)', 'ລະດັບແກ້ໄຂຄວາມຜິດພາດ', 'ຂະໜາດ', 'ນ້ອຍ', 'ກາງ', 'ໃຫຍ່', 'ສ້າງ', 'ດາວໂຫຼດ PNG', 'ດາວໂຫຼດ SVG', 'ບໍ່ມີຫຍັງໃຫ້ເຂົ້າລະຫັດ']),
+  km: L(['កម្មវិធីបង្កើត QR កូដឋិតិវន្ត', 'ទិន្នន័យរបស់អ្នកត្រូវបានអ៊ិនកូដចូល QR ដោយផ្ទាល់ បង្កើត 100% ក្នុងកម្មវិធីរុករករបស់អ្នក។ មិនឆ្លងកាត់ម៉ាស៊ីនមេអ្នកណាទេ មិនចាំបាច់ចុះឈ្មោះ - ដូច្នេះមិនផុតកំណត់ ហើយមិនអាចត្រូវបានទាមទារប្រាក់នៅពេលក្រោយ។', 'ប្រភេទ', 'URL (តំណ)', 'អត្ថបទ', 'បណ្ដាញ WiFi', 'ទំនាក់ទំនង (vCard)', 'លេខទូរស័ព្ទ', 'អ៊ីមែល', 'ឈ្មោះបណ្ដាញ (SSID)', 'ពាក្យសម្ងាត់', 'សុវត្ថិភាព', 'បើក (គ្មានពាក្យសម្ងាត់)', 'បណ្ដាញលាក់', 'ឈ្មោះពេញ', 'ទូរស័ព្ទ', 'អ៊ីមែល', 'អង្គការ (ជាជម្រើស)', 'កម្រិតកែកំហុស', 'ទំហំ', 'តូច', 'មធ្យម', 'ធំ', 'បង្កើត', 'ទាញយក PNG', 'ទាញយក SVG', 'គ្មានអ្វីត្រូវអ៊ិនកូដ']),
+  es: L(['Generador de códigos QR estáticos', 'Tus datos se codifican directamente en el QR, generado 100% en tu navegador. Sin redirección por servidores ajenos y sin registro: nunca caduca y nadie puede secuestrarlo tras una suscripción. El escáner va directo a tu contenido.', 'Tipo', 'URL', 'Texto', 'Red WiFi', 'Contacto (vCard)', 'Número de teléfono', 'Correo electrónico', 'Nombre de red (SSID)', 'Contraseña', 'Seguridad', 'Abierta (sin contraseña)', 'red oculta', 'Nombre completo', 'Teléfono', 'Correo', 'Organización (opcional)', 'Corrección de errores', 'Tamaño', 'pequeño', 'mediano', 'grande', 'Generar', 'Descargar PNG', 'Descargar SVG', 'nada que codificar']),
+  pt: L(['Gerador de código QR estático', 'Os seus dados são codificados diretamente no QR, gerado 100% no seu navegador. Sem redirecionamento por servidores de terceiros e sem cadastro: nunca expira e não pode ser sequestrado por assinatura. O leitor vai direto ao seu conteúdo.', 'Tipo', 'URL', 'Texto', 'Rede WiFi', 'Contato (vCard)', 'Número de telefone', 'E-mail', 'Nome da rede (SSID)', 'Senha', 'Segurança', 'Aberta (sem senha)', 'rede oculta', 'Nome completo', 'Telefone', 'E-mail', 'Organização (opcional)', 'Correção de erros', 'Tamanho', 'pequeno', 'médio', 'grande', 'Gerar', 'Baixar PNG', 'Baixar SVG', 'nada para codificar']),
+};
+const NAMES = { en: 'English', th: 'ไทย', zh: '中文', vi: 'Tiếng Việt', id: 'Bahasa Indonesia', ms: 'Bahasa Melayu', fil: 'Filipino', my: 'မြန်မာ', lo: 'ລາວ', km: 'ខ្មែរ', es: 'Español', pt: 'Português' };
+$('lang').innerHTML = Object.entries(NAMES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+function detectLang() {
+  const saved = localStorage.getItem('qr_lang');
+  if (saved && I18N[saved]) return saved;
+  for (const l of navigator.languages || [navigator.language || 'en']) {
+    const p = l.toLowerCase().split('-')[0];
+    if (I18N[p]) return p;
+    if (p === 'tl') return 'fil';
+  }
+  return 'en';
+}
+let cur = 'en', dict = I18N.en;
+function applyLang(code) {
+  cur = code; dict = I18N[code];
+  for (const [k, v] of Object.entries(dict)) { if (k !== 'errEmpty') { const el = $(k); if (el) el.textContent = v; } }
+  document.documentElement.lang = code;
+  $('lang').value = code;
+  syncSimpleLabel();
+}
+function syncSimpleLabel() {
+  const t = $('qtype').value;
+  $('simpleLabel').textContent = { url: dict.oUrl, text: dict.oText, tel: dict.oTel, mailto: dict.oMailto }[t] ?? dict.oText;
+}
+$('lang').onchange = () => { localStorage.setItem('qr_lang', $('lang').value); applyLang($('lang').value); };
+applyLang(detectLang());
+
+let lastQr = null;
 $('qtype').onchange = () => {
   const t = $('qtype').value;
   $('fSimple').classList.toggle('hidden', t === 'wifi' || t === 'vcard');
   $('fWifi').classList.toggle('hidden', t !== 'wifi');
   $('fVcard').classList.toggle('hidden', t !== 'vcard');
-  $('simpleLabel').textContent = { url: 'URL', text: 'Text', tel: 'Phone number', mailto: 'Email address' }[t] ?? 'Text';
+  syncSimpleLabel();
 };
 
 $('bGen').onclick = () => {
@@ -103,7 +149,7 @@ $('bGen').onclick = () => {
       auth: $('auth').value, hidden: $('hiddenNet').checked,
       name: $('vname').value, phone: $('vphone').value, email: $('vemail').value, org: $('vorg').value,
     });
-    if (!payload.trim()) { $('err').textContent = 'nothing to encode'; return; }
+    if (!payload.trim()) { $('err').textContent = dict.errEmpty; return; }
     const ec = $('ec').value;
     const cap = capacityCheck(payload, ec);
     if (cap) { $('err').textContent = cap; return; }
