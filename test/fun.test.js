@@ -214,7 +214,25 @@ test('geo: kmz extraction, stored and deflated', async () => {
 });
 
 // ---------- dicom ----------
-import { zipEntries, zipData, JUNK_RE as DJUNK, looksDicom, groupSeries, firstNum, makeLut } from '../public/dicom/logic.js';
+import { zipEntries, zipData, tarEntries, JUNK_RE as DJUNK, looksDicom, groupSeries, firstNum, makeLut, makeLatestGate } from '../public/dicom/logic.js';
+
+test('dicom: latest-gate discards a stale async decode (rapid slider drag)', async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const gate = makeLatestGate();
+  const painted = [];
+  // show A starts first but decodes slower; show B starts right after but faster.
+  // Only the latest call (B) may paint; the stale earlier result (A) is dropped.
+  const runA = (async () => { const t = gate.next(); await sleep(40); if (gate.isCurrent(t)) painted.push('A'); })();
+  const runB = (async () => { const t = gate.next(); await sleep(5); if (gate.isCurrent(t)) painted.push('B'); })();
+  await Promise.all([runA, runB]);
+  assert.deepEqual(painted, ['B']);
+  // token invariants: only the most recent next() is current
+  const g = makeLatestGate();
+  const a = g.next(); const b = g.next();
+  assert.equal(g.isCurrent(a), false);
+  assert.equal(g.isCurrent(b), true);
+  assert.equal(g.isCurrent(g.next()), true);
+});
 test('dicom: zip range-reader entries + extract', async () => {
   const kml = Buffer.from('x'.repeat(500));
   const z = makeZip([{ name: 'DICOM/A1', data: kml, method: 8 }, { name: 'AUTORUN.INF', data: Buffer.from('y'), method: 0 }]);
@@ -226,6 +244,35 @@ test('dicom: zip range-reader entries + extract', async () => {
   assert.equal(all.length, 500);
   const head = await zipData(readRange, dicom, nodeInflate, 100);
   assert.equal(head.length, 100);
+});
+test('dicom: tar indexes contiguous files via range reads', async () => {
+  const enc = new TextEncoder();
+  const mkTar = (files) => {
+    const blocks = [];
+    for (const f of files) {
+      const h = new Uint8Array(512);
+      h.set(enc.encode(f.name), 0);
+      h.set(enc.encode(f.data.length.toString(8).padStart(11, '0')), 124);
+      h[156] = 0x30;                                  // typeflag '0' = file
+      h.set(enc.encode('ustar\0'), 257);
+      blocks.push(h);
+      const d = new Uint8Array(Math.ceil(f.data.length / 512) * 512);
+      d.set(f.data, 0); blocks.push(d);
+    }
+    blocks.push(new Uint8Array(512));                 // end-of-archive zero block
+    const total = blocks.reduce((n, b) => n + b.length, 0);
+    const out = new Uint8Array(total); let o = 0;
+    for (const b of blocks) { out.set(b, o); o += b.length; }
+    return out;
+  };
+  const buf = mkTar([{ name: 'DICOMDIR', data: enc.encode('HELLO') }, { name: 'IMG/0001.dcm', data: enc.encode('DICOMDATA!') }]);
+  const readRange = async (off, len) => buf.subarray(off, off + len);
+  const es = await tarEntries(readRange, buf.length);
+  assert.equal(es.length, 2);
+  assert.equal(es[0].name, 'DICOMDIR');
+  assert.equal(es[1].name, 'IMG/0001.dcm');
+  const got = await readRange(es[1].dataOff, es[1].size);   // one range read = exactly that file
+  assert.equal(new TextDecoder().decode(got), 'DICOMDATA!');
 });
 test('dicom: junk filter, magic, grouping, lut', () => {
   assert.ok(DJUNK.test('Autorun/Autorun.exe'));
@@ -381,4 +428,16 @@ test('dicom: DICOMDIR-resolved instances have unique ids (safe cache key)', () =
   const metas = seriesFromDicomdirRecords(records, makeResolver(items, 'DICOMDIR'));
   const names = metas.map((m) => m.name);
   assert.equal(new Set(names).size, names.length);  // all image ids unique across series -> no cross-series cache collision
+});
+
+import { orientationString, edgeOrientations } from '../public/dicom/logic.js';
+test('dicom: anatomical orientation markers from ImageOrientationPatient', () => {
+  // axial (rows L->R as +x Left, cols A->P as +y Posterior): top=A bottom=P left=R right=L
+  assert.deepEqual(edgeOrientations([1, 0, 0, 0, 1, 0]), { right: 'L', left: 'R', bottom: 'P', top: 'A' });
+  // coronal (+x Left, +z Head down? cols toward Feet): top=H bottom=F left=R right=L
+  assert.deepEqual(edgeOrientations([1, 0, 0, 0, 0, -1]), { right: 'L', left: 'R', bottom: 'F', top: 'H' });
+  // sagittal (+y Posterior, +z Head): rows A->P, cols H->F
+  assert.deepEqual(edgeOrientations([0, 1, 0, 0, 0, -1]), { right: 'P', left: 'A', bottom: 'F', top: 'H' });
+  assert.equal(orientationString(0.71, 0, 0.71), 'LH');   // oblique -> two letters, dominant first
+  assert.equal(edgeOrientations(null), null);
 });

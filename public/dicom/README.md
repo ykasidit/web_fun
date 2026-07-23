@@ -1,6 +1,8 @@
+<img src="icon-512.png" width="72" align="left" alt="ClearEvo MRI/CT CD Viewer icon">
+
 # ClearEvo.com MRI/CT CD Viewer
 
-🩻 Open or stream your MRI/CT scan CD (DICOM) in the browser - index-first streaming of gigabyte CDs, series browser, window/level, measure, tags, EN/ไทย. Demo = the author's own anonymized scans (GPL).
+Open or stream your MRI/CT scan CD (DICOM) in the browser - index-first streaming of gigabyte CDs, series browser, window/level, measure, tags, EN/ไทย. Demo = the author's own anonymized scans (GPL).
 
 Live: **https://www.clearevo.com/dicom/**
 

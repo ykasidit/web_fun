@@ -52,6 +52,34 @@ export async function zipData(readRange, entry, inflateRaw, headBytes) {
   return inflateRaw(raw, headBytes);
 }
 
+// ---- TAR (uncompressed USTAR / GNU) ----
+// Files are stored contiguously and uncompressed, so - exactly like ZIP - we can
+// index by scanning only the 512-byte headers through readRange, then pull any
+// one file's bytes with a single range read. gzip/7z/rar can't do this (one
+// shared compression stream / solid blocks), which is why only plain .tar keeps
+// the index-first streaming that lets a gigabyte CD open on a phone.
+// ponytail: no GNU long-name ('L') or PAX ('x') header support - DICOM tar names
+// are short; add it only if a real CD needs it.
+export async function tarEntries(readRange, fileSize) {
+  const dec = new TextDecoder();
+  const out = [];
+  let off = 0;
+  while (off + 512 <= fileSize) {
+    const hdr = await readRange(off, 512);
+    if (hdr.every((b) => b === 0)) break;                 // zero block = end of archive
+    let name = dec.decode(hdr.subarray(0, 100)).replace(/\0.*$/, '');
+    const prefix = dec.decode(hdr.subarray(345, 500)).replace(/\0.*$/, '');
+    if (prefix) name = prefix + '/' + name;
+    const size = parseInt(dec.decode(hdr.subarray(124, 136)).replace(/[^0-7]/g, ''), 8) || 0;
+    const type = String.fromCharCode(hdr[156]);
+    const dataOff = off + 512;
+    if (name && (type === '0' || type === '\0' || type === '') && size > 0) out.push({ name, size, dataOff });
+    off = dataOff + Math.ceil(size / 512) * 512;
+  }
+  if (!out.length) throw new Error('empty or unsupported TAR archive');
+  return out;
+}
+
 // ---- DICOM helpers ----
 
 // CD junk that is definitely not image data
@@ -75,13 +103,16 @@ export function groupSeries(items) {
   return series;
 }
 
-// window/level presets, the ones every CT viewer ships
+// standard named CT window presets radiologists know by name (WW/WL in HU)
 export const CT_PRESETS = [
-  { label: 'Auto (from file)', wc: null, ww: null },
-  { label: 'Soft tissue 40/400', wc: 40, ww: 400 },
-  { label: 'Brain 40/80', wc: 40, ww: 80 },
-  { label: 'Lung -600/1500', wc: -600, ww: 1500 },
-  { label: 'Bone 300/1500', wc: 300, ww: 1500 },
+  { label: 'Default (from file)', wc: null, ww: null },
+  { label: 'Soft Tissue (400/40)', wc: 40, ww: 400 },
+  { label: 'Lung (1500/-600)', wc: -600, ww: 1500 },
+  { label: 'Bone (1800/400)', wc: 400, ww: 1800 },
+  { label: 'Brain (80/40)', wc: 40, ww: 80 },
+  { label: 'Mediastinum (350/50)', wc: 50, ww: 350 },
+  { label: 'Abdomen (400/40)', wc: 40, ww: 400 },
+  { label: 'Angio (600/300)', wc: 300, ww: 600 },
 ];
 
 // first number of a possibly multi-valued DICOM decimal string like "40\\80"
@@ -133,6 +164,37 @@ export function evictKeys(keys, indexOf, curIdx, cap) {
   });
   scored.sort((a, b) => b.d - a.d); // farthest / other-series first
   return scored.slice(0, keys.length - cap).filter((s) => s.d > 0).map((s) => s.k);
+}
+
+// anatomical direction a cosine vector points to, in DICOM patient (LPS) coords:
+// +x=Left/-x=Right, +y=Posterior/-y=Anterior, +z=Head(sup)/-z=Feet(inf).
+// returns 1-3 dominant-axis letters (e.g. 'A', 'RL' for oblique) - the edge
+// markers every clinical viewer draws.
+export function orientationString(x, y, z) {
+  const axes = [
+    { l: x < 0 ? 'R' : 'L', m: Math.abs(x) },
+    { l: y < 0 ? 'A' : 'P', m: Math.abs(y) },
+    { l: z < 0 ? 'F' : 'H', m: Math.abs(z) },
+  ].sort((a, b) => b.m - a.m);
+  return axes.filter((a) => a.m > 0.25).map((a) => a.l).join('');
+}
+// ImageOrientationPatient (6 values) -> screen-edge labels, or null
+export function edgeOrientations(iop) {
+  if (!iop || iop.length < 6) return null;
+  const [rx, ry, rz, cx, cy, cz] = iop;               // row cosines, col cosines
+  return {
+    right: orientationString(rx, ry, rz), left: orientationString(-rx, -ry, -rz),
+    bottom: orientationString(cx, cy, cz), top: orientationString(-cx, -cy, -cz),
+  };
+}
+
+// "latest call wins" gate. Rapid slider drags / scrolls fire many async show()
+// calls; a slower earlier decode can resolve AFTER a later one and paint a stale
+// frame. next() stamps a call and returns its token; isCurrent(token) is true
+// only for the most recent call, so a superseded call can bail before painting.
+export function makeLatestGate() {
+  let seq = 0;
+  return { next: () => ++seq, isCurrent: (t) => t === seq };
 }
 
 // map stored pixel values to 0..255 through rescale + window

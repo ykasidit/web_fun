@@ -9,9 +9,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ClearEvo.com MRI/CT CD Viewer - open or stream your DICOM scan CD in the browser, no upload</title>
+<!-- tab title stays constant on open; keep the version here in sync with APP_VERSION in the script -->
+<title>ClearEvo.com MRI/CT CD Viewer v1.3.0 - open or stream your DICOM scan CD in the browser, no upload</title>
 <meta name="description" content="Free online MRI/CT CD viewer: open or stream the DICOM CD from your MRI or CT scan right in your browser, on PC and phone - series list, slice scrolling, window/level, measure, tags. 100% client-side, your medical images are never uploaded. A DICOM viewer with no install and no sign-up.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩻</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='13' fill='%230c2035'/><ellipse cx='32' cy='33' rx='18' ry='21' fill='%231c5680' stroke='%235bb6e6' stroke-width='3'/><g fill='none' stroke='%230a2338' stroke-width='2.4' stroke-linecap='round'><path d='M32 14 V27 M32 39 V52'/><path d='M26 19 C21 27, 22 39, 27 47'/><path d='M38 19 C43 27, 42 39, 37 47'/><path d='M22 26 C19 32, 20 40, 24 45'/><path d='M42 26 C45 32, 44 40, 40 45'/></g><g fill='%23cdefff'><path d='M30.6 31 C28 33, 27.4 36, 29 39 C30 36, 30 34, 30.6 32Z'/><path d='M33.4 31 C36 33, 36.6 36, 35 39 C34 36, 34 34, 33.4 32Z'/></g></svg>">
 <link rel="canonical" href="https://www.clearevo.com/dicom/">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -19,65 +20,80 @@
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-H457QK43L6"></script>
 <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-H457QK43L6');</script>
-<link rel="stylesheet" href="xp.css">
 <style>
-html,body{height:100%;margin:0;background:#3a6ea5;overflow:hidden}
-body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial,sans-serif;font-size:11px}
-.title-bar-text{font-family:'Trebuchet MS','Pixelated MS Sans Serif',Tahoma,sans-serif}
-#app{display:flex;flex-direction:column;position:absolute;inset:4px}
-#app>.window-body{flex:1;display:flex;flex-direction:column;margin:0;padding:4px;min-height:0;gap:4px}
-.toolbar{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
-.toolbar button.on{box-shadow:inset 1px 1px 3px rgba(0,0,0,.4);background:#d8d4c8}
-#main{flex:1;display:flex;min-height:0;gap:4px}
-#serieslist{flex:0 0 168px;overflow-y:auto;background:#fff;border:1px solid #7f9db9;padding:2px}
-.ser{display:flex;gap:4px;align-items:center;padding:3px;cursor:pointer;border-bottom:1px solid #eee}
-.ser:hover{background:#e8f0fb}
-.ser.on{background:#316ac5;color:#fff}
-.ser canvas{background:#000;flex:0 0 48px}
-.ser .lbl{font-size:10px;overflow:hidden}
-#viewport{flex:1;position:relative;background:#000;border:1px solid #7f9db9;min-width:0;overflow:hidden;touch-action:none;cursor:crosshair}
+/* ClearEvo clinical dark theme (reading-room style; original UI, no vendor copy) */
+html,body{height:100%;margin:0;background:#070f18;color:#cdd9e5;font-family:'Segoe UI',Tahoma,'DejaVu Sans',Arial,sans-serif;font-size:12px;overflow:hidden}
+button,select,input{font-family:inherit}
+#app{display:flex;flex-direction:column;position:absolute;inset:0}
+.title-bar{display:flex;align-items:center;gap:8px;background:#0d1f33;border-bottom:1px solid #1c3550;padding:6px 12px}
+.title-bar-text{font-weight:600;color:#e6eef7;letter-spacing:.3px;overflow:hidden;white-space:nowrap;flex:1;display:flex;align-items:center;gap:8px;padding-right:140px}
+.title-bar-text svg{width:22px;height:22px;flex:0 0 auto}
+#titleText{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.window-body{flex:1;display:flex;flex-direction:column;min-height:0}
+.toolbar{display:flex;gap:1px;align-items:stretch;flex-wrap:wrap;background:#0d1f33;border-bottom:1px solid #1c3550;padding:4px 8px}
+.tbtn{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:transparent;border:1px solid transparent;border-radius:6px;color:#a7bccf;padding:4px 9px;min-width:46px;cursor:pointer;font-size:10px;line-height:1}
+.tbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tbtn:hover{background:#183350;color:#e9f2fb}
+.tbtn.on{background:#0d3a5c;border-color:#2aa9e0;color:#8fd8ff}
+.tsep{width:1px;align-self:center;height:30px;background:#1c3550;margin:0 5px}
+.toolbar select{background:#12283f;color:#cdd9e5;border:1px solid #26476a;border-radius:5px;padding:4px 7px;font-size:11px}
+#wlz{margin-left:auto;font:11px 'DejaVu Sans Mono',monospace;color:#7fb0d8;padding:0 6px;align-self:center}
+#stat{align-self:center;color:#7fb0d8;font-size:11px}
+#main{flex:1;display:flex;min-height:0}
+#serieslist{flex:0 0 182px;overflow-y:auto;background:#0a1626;border-right:1px solid #1c3550;padding:5px}
+.ser{display:flex;gap:7px;align-items:center;padding:5px;cursor:pointer;border-radius:5px;margin-bottom:3px}
+.ser:hover{background:#12283f}
+.ser.on{background:#0d3a5c;outline:1px solid #2aa9e0}
+.ser canvas{background:#000;flex:0 0 54px;border:1px solid #26476a;border-radius:2px}
+.ser .lbl{font-size:10px;color:#a7bccf;overflow:hidden;line-height:1.35}
+.ser .lbl b{color:#e6eef7}
+#viewport{flex:1;position:relative;background:#000;min-width:0;overflow:hidden;touch-action:none;cursor:crosshair}
 #cv{position:absolute;inset:0;width:100%;height:100%}
-.ov{position:absolute;color:#ffdf60;font:11px 'DejaVu Sans Mono',monospace;text-shadow:1px 1px 2px #000;pointer-events:none;white-space:pre;line-height:1.35}
-#ovTL{top:4px;left:6px} #ovTR{top:4px;right:6px;text-align:right} #ovBL{bottom:4px;left:6px} #ovBR{bottom:4px;right:6px;text-align:right}
-#sliceRow{display:flex;gap:6px;align-items:center}
-#slice{flex:1}
-@media (max-width:700px){
-  #main{flex-direction:column}
-  #serieslist{flex:0 0 84px;display:flex;overflow-x:auto;overflow-y:hidden}
-  .ser{flex:0 0 130px;border-bottom:none;border-right:1px solid #eee}
-}
-.demobtn{font:600 14px Tahoma,'Segoe UI',sans-serif;color:#fff;background:linear-gradient(#3a8dde,#2a6fc0);border:1px solid #1f5ea8;border-radius:6px;padding:9px 16px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.35)}
-.demobtn:hover{background:linear-gradient(#4a9dee,#3a7fd0)}
-</style>
-<style>/* font size controls (top right) */
-.title-bar-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:64px}
-.title-bar-controls{position:fixed;top:8px;right:10px;display:flex;align-items:center;z-index:999}
-.title-bar .fontbtn{width:26px!important;height:16px;min-width:0!important;font:bold 10px Tahoma,sans-serif!important;color:#000;background:#ece9d8;border:1px solid #fff;border-radius:3px;cursor:pointer;padding:0!important;margin-left:3px;box-shadow:0 0 1px #003c74;background-image:none!important}
+.ov{position:absolute;color:#8fe3ff;font:11px 'DejaVu Sans Mono',monospace;text-shadow:0 1px 2px #000;pointer-events:none;white-space:pre;line-height:1.4}
+#ovTL{top:6px;left:9px}#ovTR{top:6px;right:9px;text-align:right}#ovBL{bottom:6px;left:9px}#ovBR{bottom:6px;right:9px;text-align:right}
+.edge{position:absolute;color:#ffd24a;font:bold 13px 'DejaVu Sans Mono',monospace;text-shadow:0 1px 3px #000;pointer-events:none;opacity:.9}
+#edgeT{top:5px;left:50%;transform:translateX(-50%)}#edgeB{bottom:5px;left:50%;transform:translateX(-50%)}#edgeL{left:7px;top:50%;transform:translateY(-50%)}#edgeR{right:7px;top:50%;transform:translateY(-50%)}
+#sliceRow{display:flex;gap:9px;align-items:center;background:#0d1f33;border-top:1px solid #1c3550;padding:5px 12px}
+#sliceRow button{background:#12283f;color:#cdd9e5;border:1px solid #26476a;border-radius:5px;padding:3px 12px;cursor:pointer}
+#sliceRow button:hover{background:#183350}
+#slice{flex:1;accent-color:#2aa9e0}
+#sliceLbl{font:11px 'DejaVu Sans Mono',monospace;color:#7fb0d8;min-width:66px;text-align:right}
+.status-bar{background:#0a1626;border-top:1px solid #1c3550;color:#6f8aa6;font-size:11px;padding:4px 12px}
+.status-bar a{color:#4aa9e0}
+.demobtn{font:600 14px 'Segoe UI',Tahoma,sans-serif;color:#fff;background:linear-gradient(#1c86c8,#125a92);border:1px solid #2aa9e0;border-radius:7px;padding:11px 20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.demobtn:hover{background:linear-gradient(#2a96d8,#1a6aa2)}
+.title-bar-controls{position:fixed;top:8px;right:12px;display:flex;align-items:center;z-index:999}
+.title-bar .fontbtn{width:24px;height:18px;font:bold 10px Tahoma,sans-serif;color:#cdd9e5;background:#183350;border:1px solid #2aa9e0;border-radius:4px;cursor:pointer;padding:0;margin-left:3px}
+@media (max-width:700px){#main{flex-direction:column}#serieslist{flex:0 0 92px;display:flex;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #1c3550}.ser{flex:0 0 150px}.tbtn .lbl{display:none}.tbtn{min-width:38px;padding:5px 7px}}
 </style>
 </head>
 <body>
 <div class="window" id="app">
-  <div class="title-bar"><div class="title-bar-text" id="titleText">🩻 ClearEvo.com MRI/CT CD Viewer</div><div class="title-bar-controls"><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
+  <div class="title-bar"><div class="title-bar-text"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" rx="13" fill="#0c2035"/><ellipse cx="32" cy="33" rx="18" ry="21" fill="#1c5680" stroke="#5bb6e6" stroke-width="3"/><g fill="none" stroke="#0a2338" stroke-width="2.4" stroke-linecap="round"><path d="M32 14 V27 M32 39 V52"/><path d="M26 19 C21 27, 22 39, 27 47"/><path d="M38 19 C43 27, 42 39, 37 47"/><path d="M22 26 C19 32, 20 40, 24 45"/><path d="M42 26 C45 32, 44 40, 40 45"/></g><g fill="#cdefff"><path d="M30.6 31 C28 33, 27.4 36, 29 39 C30 36, 30 34, 30.6 32Z"/><path d="M33.4 31 C36 33, 36.6 36, 35 39 C34 36, 34 34, 33.4 32Z"/></g></svg><span id="titleText">ClearEvo.com MRI/CT CD Viewer</span></div><div class="title-bar-controls"><button class="fontbtn" id="bAbout" type="button" title="About - license, warranty, open-source credits">ⓘ About</button><button class="fontbtn" id="fMinus" type="button" title="smaller text">A-</button><button class="fontbtn" id="fPlus" type="button" title="larger text">A+</button></div></div>
   <div class="window-body">
   <div class="toolbar">
-    <button id="bZip">📂 Open (.zip / DICOM files)</button>
-    <button id="bDir" title="an unzipped CD folder">📁 Folder</button>
-    <span>|</span>
-    <button id="tBrowse" class="on" title="drag/swipe to scroll slices (mouse wheel always scrolls)">Browse</button>
-    <button id="tWL" title="drag: left-right = width, up-down = center">W/L</button>
-    <button id="tPan">Pan</button>
-    <button id="tZoom" title="drag up/down to zoom (pinch on touch)">Zoom</button>
-    <button id="tMeasure" title="click two points to measure distance">📏</button>
-    <button id="bReset" title="reset zoom/pan/window">Reset</button>
-    <button id="bInvert">Invert</button>
-    <button id="bTags" title="all DICOM tags of the current image">Tags</button>
+    <button class="tbtn" id="bZip" ><svg viewBox="0 0 24 24"><path d="M3 7h5l2 2h11v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 11h18"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bDir" title="an unzipped CD folder"><svg viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z"/></svg><span class="lbl"></span></button>
+    <div class="tsep"></div>
+    <button class="tbtn" id="tWL" title="drag left-right = window width, up-down = level (PACS default)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="tBrowse" title="drag/swipe to scroll slices (wheel always scrolls)"><svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 13l8 4 8-4"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="tPan" ><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M12 3l-2.4 3M12 3l2.4 3M12 21l-2.4-3M12 21l2.4-3M3 12l3-2.4M3 12l3 2.4M21 12l-3-2.4M21 12l-3 2.4"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="tZoom" title="drag to zoom (Ctrl +/-; pinch on touch)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="tMeasure" title="click two points - length in mm"><svg viewBox="0 0 24 24"><path d="M3 15L15 3l6 6L9 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span class="lbl"></span></button>
+    <div class="tsep"></div>
+    <button class="tbtn" id="bCine" title="play/stop cine loop"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bInvert" title="invert black/white"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.34 6.34 A8 8 0 0 0 17.66 17.66 Z" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bReset" title="reset zoom/pan/window"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4.5v4.5h4.5"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bCapture" title="save current image as PNG")><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bTags" title="all DICOM tags of the current image"><svg viewBox="0 0 24 24"><path d="M3 11l8-8h7v7l-8 8z"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
+    <div class="tsep"></div>
     <select id="preset" title="CT window presets"></select>
     <select id="buf" title="how many slices to buffer ahead for smooth scrolling">
-      <option value="25">25 slices ahead</option>
-      <option value="50" selected>50 slices ahead</option>
-      <option value="100">100 slices ahead</option>
+      <option value="25">buffer 25</option>
+      <option value="50" selected>buffer 50</option>
+      <option value="100">buffer 100</option>
     </select>
-    <span id="wlz" style="margin-left:auto;font:11px 'DejaVu Sans Mono',monospace;color:#333"></span>
+    <span id="wlz"></span>
     <select id="lang" title="language"></select>
     <span id="stat"></span>
   </div>
@@ -87,19 +103,21 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
       <canvas id="cv"></canvas>
       <div class="ov" id="ovTL"></div><div class="ov" id="ovTR"></div>
       <div class="ov" id="ovBL"></div><div class="ov" id="ovBR"></div>
+      <div class="edge" id="edgeT"></div><div class="edge" id="edgeB"></div><div class="edge" id="edgeL"></div><div class="edge" id="edgeR"></div>
       <div id="srcbadge" style="position:absolute;top:4px;left:50%;transform:translateX(-50%);font:11px Tahoma,sans-serif;background:rgba(0,0,0,.55);color:#fff;padding:2px 8px;border-radius:9px;display:none;text-align:center;max-width:90%"></div>
       <div id="busy" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,.45);color:#fff;font:13px Tahoma,sans-serif;gap:8px">
         <div id="busyTxt">Loading...</div>
         <div style="width:60%;max-width:280px;height:8px;background:#333;border:1px solid #777"><div id="busyBar" style="height:100%;width:0;background:#4aa3ff;transition:width .15s"></div></div>
       </div>
       <div id="empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#9fb3c8;gap:14px;padding:24px;pointer-events:none">
-        <div style="font-size:72px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">🩻</div>
+        <div style="width:88px;height:88px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))"><svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" rx="13" fill="#0c2035"/><ellipse cx="32" cy="33" rx="18" ry="21" fill="#1c5680" stroke="#5bb6e6" stroke-width="3"/><g fill="none" stroke="#0a2338" stroke-width="2.4" stroke-linecap="round"><path d="M32 14 V27 M32 39 V52"/><path d="M26 19 C21 27, 22 39, 27 47"/><path d="M38 19 C43 27, 42 39, 37 47"/><path d="M22 26 C19 32, 20 40, 24 45"/><path d="M42 26 C45 32, 44 40, 40 45"/></g><g fill="#cdefff"><path d="M30.6 31 C28 33, 27.4 36, 29 39 C30 36, 30 34, 30.6 32Z"/><path d="M33.4 31 C36 33, 36.6 36, 35 39 C34 36, 34 34, 33.4 32Z"/></g></svg></div>
         <div id="emptyTxt" style="font:14px Tahoma,'Segoe UI',sans-serif;max-width:520px;line-height:1.5"></div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;pointer-events:auto;margin-top:4px">
           <button id="demoCtBtn" class="demobtn"></button>
           <button id="demoMriBtn" class="demobtn"></button>
         </div>
       </div>
+      <div id="toast" style="position:absolute;left:50%;bottom:44px;transform:translateX(-50%);background:rgba(9,22,36,.94);border:1px solid #2f6a8f;color:#cfe8fb;font:13px Tahoma,sans-serif;padding:7px 14px;border-radius:8px;display:none;pointer-events:none;max-width:88%;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.55)"></div>
       <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
     </div>
   </div>
@@ -115,32 +133,61 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
   </div>
   <div class="status-bar"><p class="status-bar-field"><span id="sbPrivacy">100% in-browser - your medical images are NEVER uploaded</span> (Google Analytics: visit stats only - <a href="/tools-privacy/" target="_blank" rel="noopener">verify</a>) - <a href="/blog/2026/07/22/how_to_view_ct_mri_dicom_cd_in_your_browser/" target="_blank" rel="noopener">how to use</a> - <a href="/tools/" target="_blank" rel="noopener">more tools</a> - <a href="https://www.clearevo.com/">clearevo</a> - © 2026 Kasidit Yusuf, GPL v2 - <span id="sbNotDevice">not a medical device: for personal viewing, not diagnosis</span></p></div>
 </div>
+<div id="about" style="position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;background:rgba(3,10,18,.72);padding:16px">
+  <div style="background:#0d1f33;border:1px solid #2f6a8f;border-radius:12px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:22px 24px;box-shadow:0 8px 40px rgba(0,0,0,.6);color:#cdd9e5;font:13px/1.6 'Segoe UI',Tahoma,'DejaVu Sans',sans-serif">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <svg width="42" height="42" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><rect width="64" height="64" rx="13" fill="#0c2035"/><ellipse cx="32" cy="33" rx="18" ry="21" fill="#1c5680" stroke="#5bb6e6" stroke-width="3"/><g fill="none" stroke="#0a2338" stroke-width="2.4" stroke-linecap="round"><path d="M32 14 V27 M32 39 V52"/><path d="M26 19 C21 27, 22 39, 27 47"/><path d="M38 19 C43 27, 42 39, 37 47"/><path d="M22 26 C19 32, 20 40, 24 45"/><path d="M42 26 C45 32, 44 40, 40 45"/></g><g fill="#cdefff"><path d="M30.6 31 C28 33, 27.4 36, 29 39 C30 36, 30 34, 30.6 32Z"/><path d="M33.4 31 C36 33, 36.6 36, 35 39 C34 36, 34 34, 33.4 32Z"/></g></svg>
+      <div><div style="font-size:17px;font-weight:700;color:#eaf4ff">ClearEvo.com MRI/CT CD Viewer <span id="aboutVer" style="font-weight:400;font-size:13px;color:#8fb3cf"></span></div>
+      <div style="color:#8fb3cf">Free, open-source DICOM viewer - runs 100% in your browser</div></div>
+    </div>
+    <p><b>&copy; 2026 Kasidit Yusuf.</b> Free software under the <a href="https://www.gnu.org/licenses/old-licenses/gpl-2.0.html" target="_blank" rel="noopener">GNU General Public License, version 2</a>.</p>
+    <p>Provided <b>&ldquo;as is&rdquo;, with NO WARRANTY and no support</b> - without even the implied warranty of merchantability or fitness for a particular purpose. <b>Not a medical device:</b> for personal viewing of your own scans, not for diagnosis - that belongs to your radiologist and their certified tools.</p>
+    <p><b>Privacy:</b> your images are decoded on your device and are <b>never uploaded</b> (Google Analytics for visit stats only). <a href="https://www.clearevo.com/tools-privacy/" target="_blank" rel="noopener">How to verify &rarr;</a></p>
+    <p>Source code: <a href="https://github.com/ykasidit/clearevo_online_tools" target="_blank" rel="noopener">github.com/ykasidit/clearevo_online_tools</a> - issues and pull requests welcome.</p>
+    <h4 style="margin:16px 0 6px;color:#eaf4ff">Open-source components</h4>
+    <ul style="margin:0;padding-left:18px">
+      <li><a href="https://github.com/cornerstonejs/dicomParser" target="_blank" rel="noopener">dicom-parser</a> 1.8.12 - MIT License, &copy; Chris Hafey (DICOM / DICOMDIR parsing)</li>
+      <li><a href="https://github.com/rii-mango/JPEGLosslessDecoderJS" target="_blank" rel="noopener">jpeg-lossless-decoder-js</a> - MIT License, by rii-mango (JPEG Lossless pixel decoding)</li>
+      <li>Native browser APIs, no third-party code: <b>DecompressionStream</b> (Zip inflate), <b>createImageBitmap</b> (baseline JPEG), Canvas 2D.</li>
+    </ul>
+    <p style="margin-top:12px;font-size:12px;color:#8fb3cf">The MIT-licensed components above are used unmodified; the MIT license permits their use within this GPL-v2 program.</p>
+    <div style="text-align:right;margin-top:18px"><button id="aboutClose" class="demobtn" style="padding:8px 18px">Close</button></div>
+  </div>
+</div>
 <script src="./dicomParser.min.js"></script>
 <script type="module">
-import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords, makeResolver, evictKeys } from './logic.js';
+import { zipEntries, zipData, tarEntries, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords, makeResolver, evictKeys, edgeOrientations, makeLatestGate } from './logic.js';
 import * as jpegLossless from './lossless-min.js';
 const $ = (id) => document.getElementById(id);
+// App identity - bump APP_VERSION here and in the <title> tag together.
+const APP_NAME = 'ClearEvo.com MRI/CT CD Viewer';
+const APP_VERSION = '1.3.0';
+const APP_TITLE = `${APP_NAME} v${APP_VERSION}`;
+$('titleText').textContent = APP_TITLE;
+$('aboutVer').textContent = `v${APP_VERSION}`;
 const cv = $('cv'), vp = $('viewport'), ctx = cv.getContext('2d');
 const stat = (t) => { $('stat').textContent = t; };
 
 // ---- i18n (EN + natural Thai; Thai PACS keeps W/L, Zoom, Tags in English) ----
 const I18N = {
-  en: { open: 'Open file…', folder: 'Open folder…', demoSelect: '▶ Try a demo scan...',
+  en: { open: 'Open file', folder: 'Open folder', cine: 'Cine', pause: 'Pause', capture: 'Save PNG',
+    loadingPreviews: 'Loading series previews…', ready: 'Ready', startReached: 'Start of series', endReached: 'End of series', frame: 'frame', frames: 'frames', demoSelect: '▶ Try a demo scan...',
     demoCT: '▶ Try CT demo (left SCDS)', demoMRI: '▶ Try MRI demo',
     browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: 'Measure', reset: 'Reset', invert: 'Invert', tags: 'Tags',
     browseHint: 'drag / swipe to scroll through slices; pinch or Zoom tool to zoom; double-tap to zoom',
-    emptyHint: 'Open your CT/MRI scan CD (.zip) or its folder - images stay on your device, nothing is uploaded.',
+    emptyHint: 'Open your CT/MRI scan CD (.zip or .tar) or its folder - images stay on your device, nothing is uploaded.',
     sourceLocal: 'local', sourceOnDevice: 'on your device', sourceRemote: 'streaming - nothing downloaded whole',
     downloadFull: 'download the full CD (GPL)', fastest: 'For fastest scrolling,', andOpenLocally: 'and open it locally.',
     loadingIndex: 'Reading scan index', parsing: 'Parsing index...', connecting: 'Connecting...',
     readingArchive: 'Reading archive index...', buffering: 'Buffering slice', loadingSlice: 'Loading...',
     notDevice: 'not a medical device: for personal viewing, not diagnosis',
     privacy: '100% in-browser - your medical images are NEVER uploaded', langName: 'EN' },
-  th: { open: 'เปิดไฟล์…', folder: 'เปิดโฟลเดอร์…', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
+  th: { open: 'เปิดไฟล์', folder: 'เปิดโฟลเดอร์', cine: 'ซีเน', pause: 'พัก', capture: 'บันทึก PNG',
+    loadingPreviews: 'กำลังโหลดตัวอย่างซีรีส์…', ready: 'พร้อมแล้ว', startReached: 'ต้นซีรีส์แล้ว', endReached: 'ท้ายซีรีส์แล้ว', frame: 'ภาพ', frames: 'ภาพ', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
     demoCT: '▶ ลองตัวอย่าง CT (SCDS)', demoMRI: '▶ ลองตัวอย่าง MRI',
     browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: 'วัดระยะ', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
     browseHint: 'ลาก / ปัดเพื่อไล่ดู slice; ใช้สองนิ้วหุบ-ถ่าง หรือเครื่องมือ Zoom เพื่อซูม; แตะสองครั้งเพื่อซูม',
-    emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ',
+    emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip หรือ .tar) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ',
     sourceLocal: 'local', sourceOnDevice: 'อยู่ในเครื่องคุณ', sourceRemote: 'สตรีม - ไม่ได้ดาวน์โหลดทั้งไฟล์',
     downloadFull: 'ดาวน์โหลดทั้งแผ่น (GPL)', fastest: 'ถ้าอยากให้ไล่ดูภาพลื่นที่สุด', andOpenLocally: 'แล้วเปิดจากในเครื่อง',
     loadingIndex: 'กำลังอ่านรายการภาพสแกน', parsing: 'กำลังแปลงรายการภาพ...', connecting: 'กำลังเชื่อมต่อ...',
@@ -153,12 +200,12 @@ function applyLang(code) {
   T = I18N[code] || I18N.en;
   document.documentElement.lang = code;
   $('lang').value = code;
-  $('bZip').textContent = '📂 ' + T.open;
-  $('bDir').textContent = '📁 ' + T.folder;
+  const lbl = (id, t) => { const el = $(id) && $(id).querySelector('.lbl'); if (el) el.textContent = t; };
+  lbl('bZip', T.open); lbl('bDir', T.folder);
   $('demoCtBtn').textContent = T.demoCT; $('demoMriBtn').textContent = T.demoMRI;
-  $('tBrowse').textContent = '↕ ' + T.browse; $('tWL').textContent = '◐ ' + T.wl; $('tPan').textContent = '✋ ' + T.pan;
-  $('tZoom').textContent = '🔍 ' + T.zoom; $('tMeasure').textContent = '📏 ' + T.measure; $('bReset').textContent = '↺ ' + T.reset;
-  $('bInvert').textContent = '◨ ' + T.invert; $('bTags').textContent = '🏷 ' + T.tags; $('tBrowse').title = T.browseHint;
+  lbl('tWL', T.wl); lbl('tBrowse', T.browse); lbl('tPan', T.pan); lbl('tZoom', T.zoom); lbl('tMeasure', T.measure);
+  lbl('bCine', T.cine); lbl('bInvert', T.invert); lbl('bReset', T.reset); lbl('bCapture', T.capture); lbl('bTags', T.tags);
+  $('tBrowse').title = T.browseHint;
   $('sbPrivacy').textContent = T.privacy; $('sbNotDevice').textContent = T.notDevice;
   if (!frame && !series.length) drawEmpty();
   if (curSourceLabel) setSource(source, curSourceLabel, remoteUrl);
@@ -166,7 +213,10 @@ function applyLang(code) {
 $('lang') && ($('lang').innerHTML = '<option value="en">EN</option><option value="th">ไทย</option>');
 function detectLang() {
   const saved = localStorage.getItem('ce_lang'); if (saved && I18N[saved]) return saved;
-  return (navigator.languages || [navigator.language || 'en']).some((l) => l.toLowerCase().startsWith('th')) ? 'th' : 'en';
+  // Thai only if the PRIMARY browser language is Thai - having Thai as a secondary
+  // language (common in TH even with an English device) must not force Thai.
+  const primary = (((navigator.languages || [])[0]) || navigator.language || 'en').toLowerCase();
+  return primary.startsWith('th') ? 'th' : 'en';
 }
 
 // loading/buffering indicator (frac 0..1, or null to hide)
@@ -215,12 +265,30 @@ async function inflateRaw(raw, maxBytes) {
 let items = [];        // [{name, usize, getBytes(headBytes?)}]
 let series = [], cur = null, idx = 0;
 
-async function openZip(file) {
+// sniff the archive by magic bytes and build the {name, usize, getBytes} list.
+// Only ZIP and plain TAR keep index-first streaming; gz/7z/rar are refused with
+// a message that says why and what to do instead (their compression has no
+// random access, so a slice can't be read without the whole archive).
+async function archiveEntries(readRange, size) {
+  const b = await readRange(0, Math.min(size, 264));
+  const is = (sig, at = 0) => sig.every((c, i) => b[at + i] === c);
+  if (is([0x50, 0x4b, 0x03, 0x04]) || is([0x50, 0x4b, 0x05, 0x06])) {              // 'PK..' ZIP
+    const entries = await zipEntries(readRange, size);
+    return entries.map((e) => ({ name: e.name, usize: e.usize, getBytes: (h) => zipData(readRange, e, inflateRaw, h) }));
+  }
+  if (is([0x75, 0x73, 0x74, 0x61, 0x72], 257)) {                                   // 'ustar' TAR
+    const entries = await tarEntries(readRange, size);
+    return entries.map((e) => ({ name: e.name, usize: e.size, getBytes: (h) => readRange(e.dataOff, h ? Math.min(h, e.size) : e.size) }));
+  }
+  if (is([0x1f, 0x8b])) throw new Error('This looks like a .gz / .tar.gz. gzip has no random access, so a gigabyte CD would have to be fully downloaded and decompressed. Please unzip it to a plain .tar or a folder first, then open that.');
+  if (is([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])) throw new Error('.7z is not supported: its solid compression blocks prevent reading one slice at a time. Please use a .zip, a plain .tar, or the unzipped CD folder.');
+  if (is([0x52, 0x61, 0x72, 0x21])) throw new Error('.rar is not supported (proprietary format, no license-compatible decoder). Please use a .zip, a plain .tar, or the unzipped CD folder.');
+  throw new Error('Unrecognized archive. Please use a .zip, a plain .tar, or the unzipped CD folder / .dcm files.');
+}
+async function openArchive(file) {
   setSource('local', file.name);
   const readRange = async (off, len) => new Uint8Array(await file.slice(off, off + len).arrayBuffer());
-  const entries = await zipEntries(readRange, file.size);
-  const all = entries.map((e) => ({ name: e.name, usize: e.usize, getBytes: (h) => zipData(readRange, e, inflateRaw, h) }));
-  await indexAndScan(all);
+  await indexAndScan(await archiveEntries(readRange, file.size));
 }
 // stream a whole CD straight from a URL over HTTP Range - the CD stays on the
 // server, we pull only the DICOMDIR index + the slices you actually look at.
@@ -247,9 +315,7 @@ async function openUrl(url, label) {
     return new Uint8Array(await r.arrayBuffer());
   };
   busy(T.readingArchive, null);
-  const entries = await zipEntries(readRange, size);
-  const all = entries.map((e) => ({ name: e.name, usize: e.usize, getBytes: (b) => zipData(readRange, e, inflateRaw, b) }));
-  await indexAndScan(all);
+  await indexAndScan(await archiveEntries(readRange, size));
 }
 async function openFiles(files) {
   const root = (files[0] && files[0].webkitRelativePath || '').split('/')[0];
@@ -301,7 +367,7 @@ async function scanFromDicomdir(dd, resolve) {
   if (source === 'remote') stat(`${series.length} series, ${metas.length} images (streaming). For fastest scrolling, download the whole CD and open it locally.`);
   renderSeriesList();
   fillDescriptions();
-  selectSeries(series[0]);
+  selectSeries(biggestSeries());   // skip 1-frame localizers/topograms - land on the real stack
 }
 async function fillDescriptions() {
   let banner = false;
@@ -317,10 +383,25 @@ async function fillDescriptions() {
 }
 function patientBanner(m) {
   bannerMeta = m;
-  $('titleText').textContent = `🩻 ${m.patient ?? 'ClearEvo.com MRI/CT CD Viewer'}`;
+  // patient/scan as prefix, app name + version kept as suffix (standard "Document — App" form)
+  $('titleText').textContent = m.patient ? `${m.patient} — ${APP_TITLE}` : APP_TITLE;
   if (frame) render();
 }
 let bannerMeta = null;
+
+// ---- browse-ready lock + transient toasts ----
+let ready = true, toastTimer = 0;
+function toast(msg, sticky) {
+  const t = $('toast'); if (!t) return;
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer);
+  if (!sticky) toastTimer = setTimeout(() => { t.style.display = 'none'; }, 1700);
+}
+// slice browsing is locked until every series preview (left panel) has decoded,
+// so scroll input can't queue behind thumbnail decodes and then flush in one
+// big unstoppable jump. W/L, pan, zoom and series-switching stay live.
+function setBrowseLock(locked) { ready = !locked; const sl = $('slice'); if (sl) sl.disabled = locked; if (locked) toast(T.loadingPreviews, true); }
+function biggestSeries() { return series.reduce((a, b) => (b.instances.length > a.instances.length ? b : a), series[0]); }
 
 function dsMeta(ds, name) {
   const num = (t) => { const v = ds.string(t); return v == null ? null : parseFloat(v); };
@@ -360,11 +441,12 @@ async function scan() {
   stat(`${series.length} series, ${metas.length} images - nothing was uploaded`);
   patientBanner(metas[0]);
   renderSeriesList();
-  selectSeries(series[0]);
+  selectSeries(biggestSeries());   // skip 1-frame localizers/topograms - land on the real stack
 }
 
 function renderSeriesList() {
   const box = $('serieslist'); box.innerHTML = '';
+  thumbQueue.length = 0;                            // drop any stale queue from a previous open
   for (const s of series) {
     const d = document.createElement('div');
     d.className = 'ser';
@@ -373,6 +455,7 @@ function renderSeriesList() {
     s.el = d; box.appendChild(d);
     thumbQueue.push(s);
   }
+  setBrowseLock(true);
   pumpThumbs();
 }
 
@@ -459,8 +542,9 @@ let measure = [], lastTf = null, lastTap = 0;
 const cache = new Map();       // UNIQUE image id (file name) -> frame
 const inflight = new Set();    // image ids currently decoding
 let prefetchN = 50, lastDir = 1, seriesGen = 0;
+const showGate = makeLatestGate();   // latest show() call wins - guards against stale-frame paints
 let nameIdx = new Map();       // image id -> index in the CURRENT series
-const CONCURRENCY = 4;
+const DL_CONCURRENCY = 3;   // parallel range downloads - shared by prefetch buffer + series previews
 function cacheCap() { return Math.max(24, prefetchN * 2 + 4); }
 function cachePut(name, v) {
   cache.set(name, v);
@@ -482,13 +566,14 @@ function decodeIntoCache(i) {
 function ensurePrefetch() {
   if (!cur) return;
   const n = cur.instances.length;
-  for (let k = 1; k <= prefetchN && inflight.size < CONCURRENCY; k++) {
+  for (let k = 1; k <= prefetchN && inflight.size < DL_CONCURRENCY; k++) {
     const j = idx + k * lastDir; if (j >= 0 && j < n) decodeIntoCache(j);
   }
-  const b = idx - lastDir; if (inflight.size < CONCURRENCY && b >= 0 && b < n) decodeIntoCache(b);
+  const b = idx - lastDir; if (inflight.size < DL_CONCURRENCY && b >= 0 && b < n) decodeIntoCache(b);
 }
 
 async function selectSeries(s) {
+  if (typeof stopCine === 'function') stopCine();
   cur = s; idx = 0; inflight.clear(); seriesGen++; zoom = 1; panX = panY = 0; invert = false; needWL = true; lastDir = 1;
   nameIdx = new Map(s.instances.map((it, i) => [it.name, i]));
   series.forEach((x) => x.el && x.el.classList.toggle('on', x === s));
@@ -497,20 +582,26 @@ async function selectSeries(s) {
 }
 async function show(i) {
   if (!cur) return;
-  const target = Math.max(0, Math.min(cur.instances.length - 1, i));
+  const n = cur.instances.length;
+  if (i < 0 || i > n - 1) toast(`${i < 0 ? T.startReached : T.endReached} · ${n} ${n === 1 ? T.frame : T.frames} · S${cur.num ?? '?'}${cur.desc ? ' ' + cur.desc.slice(0, 22) : ''}`);
+  const target = Math.max(0, Math.min(n - 1, i));
   if (target !== idx) lastDir = target > idx ? 1 : -1;
   idx = target;
   measure = [];
-  $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${cur.instances.length}`;
-  const name = cur.instances[idx].name, gen = seriesGen;
+  const token = showGate.next();                       // this call supersedes any in-flight show()
+  const inst = cur.instances[idx], name = inst.name, gen = seriesGen;
+  $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${n}`;
   try {
     let fr = cache.get(name);
     if (!fr) {
-      if (source === 'remote') busy(`${T.buffering} ${idx + 1}/${cur.instances.length}...`, null);
-      fr = await decodeInstance(cur.instances[idx]);
-      if (gen !== seriesGen) return;   // series changed while we awaited - discard, don't render the wrong frame
-      cachePut(name, fr); busy(null);
+      if (source === 'remote') busy(`${T.buffering} ${idx + 1}/${n}...`, null);
+      fr = await decodeInstance(inst);
+      // discard if the series changed OR a newer show() has started - never paint a stale/far-away frame
+      if (gen !== seriesGen || !showGate.isCurrent(token)) return;
+      cachePut(name, fr);
     }
+    if (!showGate.isCurrent(token)) return;             // a newer show() is already the current frame
+    busy(null);
     frame = fr;
     if (needWL) { wc = fr.wc0; ww = fr.ww0; needWL = false; }
     if (presetSel.value !== '0') { const p = CT_PRESETS[+presetSel.value]; wc = p.wc; ww = p.ww; }
@@ -575,19 +666,50 @@ function render() {
   $('ovBL').textContent = `S${cur.num ?? '?'} ${cur.modality} ${cur.desc}\nimg ${idx + 1}/${cur.instances.length}  ${frame.cols}x${frame.rows}`;
   $('ovBR').textContent = frame.bitmap ? `zoom ${(zoom * 100).toFixed(0)}%` : `WL ${Math.round(wc)} / WW ${Math.round(ww)}\nzoom ${(zoom * 100).toFixed(0)}%`;
   $('wlz').textContent = frame.bitmap ? `zoom ${(zoom * 100).toFixed(0)}%` : `WL ${Math.round(wc)} · WW ${Math.round(ww)} · zoom ${(zoom * 100).toFixed(0)}%`;
+  let eo = null;
+  try { const iop = frame.ds && frame.ds.string('x00200037'); if (iop) eo = edgeOrientations(iop.split('\\').map(parseFloat)); } catch {}
+  $('edgeT').textContent = eo ? eo.top : ''; $('edgeB').textContent = eo ? eo.bottom : '';
+  $('edgeL').textContent = eo ? eo.left : ''; $('edgeR').textContent = eo ? eo.right : '';
   drawBufBar();
 }
 
 // thumbnails, lazily after scan
 const thumbQueue = [];
+let thumbGen = 0;
+async function drawThumb(s) {
+  try {
+    const fr = await decodeInstance(s.instances[Math.floor(s.instances.length / 2)]);
+    if (!s.el || !s.el.isConnected) return true;   // series list was replaced; nothing to draw
+    s.el.querySelector('canvas').getContext('2d').drawImage(paint(fr, fr.wc0, fr.ww0, false), 0, 0, 48, 48);
+    return true;
+  } catch { return false; }
+}
 async function pumpThumbs() {
-  while (thumbQueue.length) {
-    const s = thumbQueue.shift();
-    try {
-      const fr = await decodeInstance(s.instances[Math.floor(s.instances.length / 2)]);
-      const t = s.el.querySelector('canvas'), tc = t.getContext('2d');
-      tc.drawImage(paint(fr, fr.wc0, fr.ww0, false), 0, 0, 48, 48);
-    } catch {}
+  const gen = ++thumbGen;
+  const total = thumbQueue.length; let k = 0;
+  const failed = [];
+  // decode previews with DL_CONCURRENCY workers pulling from the shared queue
+  const worker = async () => {
+    for (;;) {
+      if (gen !== thumbGen) return;
+      const s = thumbQueue.shift();
+      if (!s) return;
+      if (!(await drawThumb(s))) failed.push(s);
+      k++;
+      if (!ready) toast(`${T.loadingPreviews} ${k}/${total}`, true);
+    }
+  };
+  await Promise.all(Array.from({ length: DL_CONCURRENCY }, worker));
+  if (gen !== thumbGen) return;
+  setBrowseLock(false);
+  if (total) toast(T.ready);
+  // retry previews that failed (e.g. a 5G<->wifi switch dropped their fetch), in parallel with backoff
+  for (let attempt = 1; attempt <= 4 && failed.length; attempt++) {
+    await new Promise((r) => setTimeout(r, 1500 * attempt));
+    if (gen !== thumbGen) return;
+    const batch = failed.splice(0);
+    const oks = await Promise.all(batch.map((s) => drawThumb(s)));
+    oks.forEach((ok, i) => { if (!ok) failed.push(batch[i]); });
   }
 }
 
@@ -597,7 +719,8 @@ presetSel.innerHTML = CT_PRESETS.map((p, i) => `<option value="${i}">${p.label}<
 presetSel.onchange = () => { const p = CT_PRESETS[+presetSel.value]; if (p.wc != null) { wc = p.wc; ww = p.ww; } else if (frame) { wc = frame.wc0; ww = frame.ww0; } render(); };
 async function openAny(files) {
   try {
-    if (files.length === 1 && /\.(zip)$/i.test(files[0].name)) { stat('reading archive index...'); await openZip(files[0]); }
+    // one archive file (.zip/.tar work; .gz/.7z/.rar get a helpful refusal from archiveEntries)
+    if (files.length === 1 && /\.(zip|tar|tgz|gz|7z|rar)$/i.test(files[0].name)) { stat('reading archive index...'); await openArchive(files[0]); }
     else await openFiles(files);
   } catch (e) { stat(e.message); }
 }
@@ -608,8 +731,8 @@ document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfe
 $('bDir').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.webkitdirectory = true;
   i.onchange = async () => { if (i.files.length) { try { await openFiles(i.files); } catch (e) { stat(e.message); } } }; i.click(); };
 const DEMOS = {
-  ct: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_ct_demo.zip', label: 'demo CT' },
-  mri: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_mri_demo.zip', label: 'demo MRI' },
+  ct: { url: '/dicom-demo/scds_ct_demo.zip', label: 'demo CT' },
+  mri: { url: '/dicom-demo/scds_mri_demo.zip', label: 'demo MRI' },
 };
 async function loadDemo(key) { try { await openUrl(DEMOS[key].url, DEMOS[key].label); } catch (e) { stat(`demo failed: ${e.message}`); } }
 $('demoCtBtn').onclick = () => loadDemo('ct');
@@ -633,18 +756,51 @@ $('bTags').onclick = () => {
   el.style.display = 'block';
 };
 $('bReset').onclick = () => { zoom = 1; panX = panY = 0; if (frame) { wc = frame.wc0; ww = frame.ww0; } presetSel.value = '0'; render(); };
+// snapshot: save the current windowed slice as a native-resolution PNG
+$('bCapture').onclick = () => {
+  if (!frame) return;
+  const off = frame.bitmap ?? paint(frame, wc, ww, invert);
+  const c = document.createElement('canvas'); c.width = frame.cols; c.height = frame.rows;
+  c.getContext('2d').drawImage(off, 0, 0);
+  const nm = ((bannerMeta && bannerMeta.patient) || 'image').replace(/[^\w-]+/g, '_');
+  const a = document.createElement('a'); a.href = c.toDataURL('image/png');
+  a.download = `${nm}_S${cur ? cur.num : 0}_${idx + 1}.png`; a.click();
+};
+// cine loop through the series - button toggles play <-> pause (icon + label)
+let cineTimer = 0;
+const CINE_PLAY = '<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>';
+const CINE_PAUSE = '<rect x="7" y="5" width="3.4" height="14" rx="1" fill="currentColor" stroke="none"/><rect x="13.6" y="5" width="3.4" height="14" rx="1" fill="currentColor" stroke="none"/>';
+function setCineUI(playing) {
+  const btn = $('bCine');
+  btn.querySelector('svg').innerHTML = playing ? CINE_PAUSE : CINE_PLAY;
+  btn.querySelector('.lbl').textContent = playing ? T.pause : T.cine;
+  btn.classList.toggle('on', playing);
+}
+function stopCine() { if (cineTimer) { clearInterval(cineTimer); cineTimer = 0; } setCineUI(false); }
+$('bCine').onclick = () => {
+  if (cineTimer) { stopCine(); return; }
+  if (!ready || !cur || cur.instances.length < 2) return;
+  cineTimer = setInterval(() => show(idx + 1 >= cur.instances.length ? 0 : idx + 1), 110);
+  setCineUI(true);
+};
+$('tBrowse').classList.add('on');   // Browse (slice scroll) active by default - what phone users want first
 $('bInvert').onclick = () => { invert = !invert; render(); };
-$('bPrev').onclick = () => show(idx - 1);
-$('bNext').onclick = () => show(idx + 1);
-$('slice').oninput = () => show(+$('slice').value);
-vp.addEventListener('wheel', (e) => { e.preventDefault(); show(idx + (e.deltaY > 0 ? 1 : -1)); }, { passive: false });
+$('bAbout').onclick = () => { $('about').style.display = 'flex'; };
+$('aboutClose').onclick = () => { $('about').style.display = 'none'; };
+$('about').onclick = (e) => { if (e.target === $('about')) $('about').style.display = 'none'; };
+$('bPrev').onclick = () => { if (ready) show(idx - 1); };
+$('bNext').onclick = () => { if (ready) show(idx + 1); };
+$('slice').oninput = () => { if (ready) show(+$('slice').value); };
+vp.addEventListener('wheel', (e) => { e.preventDefault(); if (ready) show(idx + (e.deltaY > 0 ? 1 : -1)); }, { passive: false });
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { $('about').style.display = 'none'; $('tags').style.display = 'none'; }
   if (e.ctrlKey || e.metaKey) {   // Ctrl +/- zooms the image (not the browser)
     if (e.key === '=' || e.key === '+') { e.preventDefault(); zoom = Math.min(12, zoom * 1.2); render(); }
     else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoom = Math.max(0.2, zoom / 1.2); render(); }
     else if (e.key === '0') { e.preventDefault(); zoom = 1; panX = panY = 0; render(); }
     return;
   }
+  if (!ready) return;
   if (e.key === 'ArrowDown' || e.key === 'ArrowRight') show(idx + 1);
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') show(idx - 1);
 });
@@ -654,6 +810,9 @@ window.addEventListener('resize', render);
 const pts = new Map();
 let pinchD = 0, browseAcc = 0;
 vp.addEventListener('pointerdown', (e) => {
+  // don't capture the pointer for overlay controls (demo buttons etc.) - capture
+  // steals the pointerup and the button never gets its click.
+  if (e.target.closest('button, select, a, input')) return;
   vp.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 });
   if (pts.size === 2) { const [a, b] = [...pts.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); }
   if (tool === 'measure' && frame && lastTf && pts.size === 1) {
@@ -688,8 +847,9 @@ vp.addEventListener('pointermove', (e) => {
   if (tool === 'wl' && frame && !frame.bitmap) { ww = Math.max(1, ww + dx * (ww / 200 + 1)); wc = wc + dy * (ww / 400 + 0.5); render(); }
   else if (tool === 'pan') { panX += dx; panY += dy; render(); }
   else if (tool === 'zoom') { zoom = Math.max(0.2, Math.min(12, zoom * (1 - dy / 150))); render(); }
-  else if (tool === 'browse' && cur) {
-    if (zoom > 1.05) { panX += dx; panY += dy; render(); return; }  // photo-app: zoomed = drag pans
+  else if (tool === 'browse' && cur && ready) {
+    // Browse always scrolls slices, even when zoomed in (pan is on the Pan tool /
+    // two fingers) - otherwise picking Browse while zoomed just panned the image.
     browseAcc += (Math.abs(dx) > Math.abs(dy) ? dx : dy);
     const step = Math.max(24, vp.clientHeight / Math.max(1, cur.instances.length));
     while (browseAcc >= step) { browseAcc -= step; show(idx + 1); }
