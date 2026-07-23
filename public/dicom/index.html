@@ -46,6 +46,8 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
   #serieslist{flex:0 0 84px;display:flex;overflow-x:auto;overflow-y:hidden}
   .ser{flex:0 0 130px;border-bottom:none;border-right:1px solid #eee}
 }
+.demobtn{font:600 14px Tahoma,'Segoe UI',sans-serif;color:#fff;background:linear-gradient(#3a8dde,#2a6fc0);border:1px solid #1f5ea8;border-radius:6px;padding:9px 16px;cursor:pointer;box-shadow:0 2px 5px rgba(0,0,0,.35)}
+.demobtn:hover{background:linear-gradient(#4a9dee,#3a7fd0)}
 </style>
 <style>/* font size controls (top right) */
 .title-bar-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:64px}
@@ -60,11 +62,6 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
   <div class="toolbar">
     <button id="bZip">📂 Open (.zip / DICOM files)</button>
     <button id="bDir" title="an unzipped CD folder">📁 Folder</button>
-    <select id="demo" title="author's own anonymized scans, streamed live - nothing downloaded whole">
-      <option value="">▶ Try a demo scan...</option>
-      <option value="ct">Demo: CT temporal bone (left SCDS)</option>
-      <option value="mri">Demo: MRI brain / base of skull</option>
-    </select>
     <span>|</span>
     <button id="tBrowse" class="on" title="drag/swipe to scroll slices (mouse wheel always scrolls)">Browse</button>
     <button id="tWL" title="drag: left-right = width, up-down = center">W/L</button>
@@ -80,7 +77,8 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
       <option value="50" selected>50 slices ahead</option>
       <option value="100">100 slices ahead</option>
     </select>
-    <select id="lang" title="language" style="margin-left:auto"></select>
+    <span id="wlz" style="margin-left:auto;font:11px 'DejaVu Sans Mono',monospace;color:#333"></span>
+    <select id="lang" title="language"></select>
     <span id="stat"></span>
   </div>
   <div id="main">
@@ -94,17 +92,24 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
         <div id="busyTxt">Loading...</div>
         <div style="width:60%;max-width:280px;height:8px;background:#333;border:1px solid #777"><div id="busyBar" style="height:100%;width:0;background:#4aa3ff;transition:width .15s"></div></div>
       </div>
-      <div id="empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#9fb3c8;gap:12px;padding:24px;pointer-events:none">
+      <div id="empty" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#9fb3c8;gap:14px;padding:24px;pointer-events:none">
         <div style="font-size:72px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">🩻</div>
         <div id="emptyTxt" style="font:14px Tahoma,'Segoe UI',sans-serif;max-width:520px;line-height:1.5"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;pointer-events:auto;margin-top:4px">
+          <button id="demoCtBtn" class="demobtn"></button>
+          <button id="demoMriBtn" class="demobtn"></button>
+        </div>
       </div>
       <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
     </div>
   </div>
   <div id="sliceRow">
-    <button id="bPrev">◀</button>
-    <input type="range" id="slice" min="0" max="0" value="0">
-    <button id="bNext">▶</button>
+    <button id="bPrev" title="previous slice">◀</button>
+    <div style="flex:1;display:flex;flex-direction:column;gap:1px">
+      <input type="range" id="slice" min="0" max="0" value="0" style="width:100%;margin:0">
+      <canvas id="bufbar" title="green = buffered slices" style="width:100%;height:4px;display:block"></canvas>
+    </div>
+    <button id="bNext" title="next slice">▶</button>
     <span id="sliceLbl">-/-</span>
   </div>
   </div>
@@ -112,7 +117,7 @@ body,button,select,input,label{font-family:Tahoma,'Segoe UI','DejaVu Sans',Arial
 </div>
 <script src="./dicomParser.min.js"></script>
 <script type="module">
-import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords, makeResolver } from './logic.js';
+import { zipEntries, zipData, JUNK_RE, looksDicom, groupSeries, CT_PRESETS, firstNum, makeLut, normKey, seriesFromDicomdirRecords, makeResolver, evictKeys } from './logic.js';
 import * as jpegLossless from './lossless-min.js';
 const $ = (id) => document.getElementById(id);
 const cv = $('cv'), vp = $('viewport'), ctx = cv.getContext('2d');
@@ -120,9 +125,9 @@ const stat = (t) => { $('stat').textContent = t; };
 
 // ---- i18n (EN + natural Thai; Thai PACS keeps W/L, Zoom, Tags in English) ----
 const I18N = {
-  en: { open: 'Open (.zip / DICOM files)', folder: 'Folder', demoSelect: '▶ Try a demo scan...',
-    demoCT: 'Demo: CT temporal bone (left SCDS)', demoMRI: 'Demo: MRI brain / base of skull',
-    browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: '📏', reset: 'Reset', invert: 'Invert', tags: 'Tags',
+  en: { open: 'Open file…', folder: 'Open folder…', demoSelect: '▶ Try a demo scan...',
+    demoCT: '▶ Try CT demo (left SCDS)', demoMRI: '▶ Try MRI demo',
+    browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: 'Measure', reset: 'Reset', invert: 'Invert', tags: 'Tags',
     browseHint: 'drag / swipe to scroll through slices; pinch or Zoom tool to zoom; double-tap to zoom',
     emptyHint: 'Open your CT/MRI scan CD (.zip) or its folder - images stay on your device, nothing is uploaded.',
     sourceLocal: 'local', sourceOnDevice: 'on your device', sourceRemote: 'streaming - nothing downloaded whole',
@@ -131,9 +136,9 @@ const I18N = {
     readingArchive: 'Reading archive index...', buffering: 'Buffering slice', loadingSlice: 'Loading...',
     notDevice: 'not a medical device: for personal viewing, not diagnosis',
     privacy: '100% in-browser - your medical images are NEVER uploaded', langName: 'EN' },
-  th: { open: 'เปิด (.zip / ไฟล์ DICOM)', folder: 'โฟลเดอร์', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
-    demoCT: 'ตัวอย่าง: CT temporal bone (SCDS ข้างซ้าย)', demoMRI: 'ตัวอย่าง: MRI สมอง / ฐานกะโหลก',
-    browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: '📏', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
+  th: { open: 'เปิดไฟล์…', folder: 'เปิดโฟลเดอร์…', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
+    demoCT: '▶ ลองตัวอย่าง CT (SCDS)', demoMRI: '▶ ลองตัวอย่าง MRI',
+    browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: 'วัดระยะ', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
     browseHint: 'ลาก / ปัดเพื่อไล่ดู slice; ใช้สองนิ้วหุบ-ถ่าง หรือเครื่องมือ Zoom เพื่อซูม; แตะสองครั้งเพื่อซูม',
     emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ',
     sourceLocal: 'local', sourceOnDevice: 'อยู่ในเครื่องคุณ', sourceRemote: 'สตรีม - ไม่ได้ดาวน์โหลดทั้งไฟล์',
@@ -150,10 +155,10 @@ function applyLang(code) {
   $('lang').value = code;
   $('bZip').textContent = '📂 ' + T.open;
   $('bDir').textContent = '📁 ' + T.folder;
-  const demo = $('demo'); demo.options[0].textContent = T.demoSelect; demo.options[1].textContent = T.demoCT; demo.options[2].textContent = T.demoMRI;
-  $('tBrowse').textContent = T.browse; $('tWL').textContent = T.wl; $('tPan').textContent = T.pan;
-  $('tZoom').textContent = T.zoom; $('tMeasure').textContent = T.measure; $('bReset').textContent = T.reset;
-  $('bInvert').textContent = T.invert; $('bTags').textContent = T.tags; $('tBrowse').title = T.browseHint;
+  $('demoCtBtn').textContent = T.demoCT; $('demoMriBtn').textContent = T.demoMRI;
+  $('tBrowse').textContent = '↕ ' + T.browse; $('tWL').textContent = '◐ ' + T.wl; $('tPan').textContent = '✋ ' + T.pan;
+  $('tZoom').textContent = '🔍 ' + T.zoom; $('tMeasure').textContent = '📏 ' + T.measure; $('bReset').textContent = '↺ ' + T.reset;
+  $('bInvert').textContent = '◨ ' + T.invert; $('bTags').textContent = '🏷 ' + T.tags; $('tBrowse').title = T.browseHint;
   $('sbPrivacy').textContent = T.privacy; $('sbNotDevice').textContent = T.notDevice;
   if (!frame && !series.length) drawEmpty();
   if (curSourceLabel) setSource(source, curSourceLabel, remoteUrl);
@@ -451,43 +456,41 @@ let measure = [], lastTf = null, lastTap = 0;
 // direction (a couple behind too). Fetches run concurrently (capped) and each
 // completion tops the buffer back up, so scrolling stays smooth instead of
 // blocking one Range request per frame.
-const cache = new Map(); // idx -> frame
-const inflight = new Set();
-let prefetchN = 50, lastDir = 1;
+const cache = new Map();       // UNIQUE image id (file name) -> frame
+const inflight = new Set();    // image ids currently decoding
+let prefetchN = 50, lastDir = 1, seriesGen = 0;
+let nameIdx = new Map();       // image id -> index in the CURRENT series
 const CONCURRENCY = 4;
 function cacheCap() { return Math.max(24, prefetchN * 2 + 4); }
-function cachePut(k, v) {
-  cache.set(k, v);
-  while (cache.size > cacheCap()) {
-    // evict the buffered slice farthest from the current view
-    let far = null, fd = -1;
-    for (const key of cache.keys()) { const d = Math.abs(key - idx); if (d > fd) { fd = d; far = key; } }
-    if (far === idx || far === null) break;
-    cache.delete(far);
+function cachePut(name, v) {
+  cache.set(name, v);
+  if (cache.size > cacheCap()) {
+    for (const k of evictKeys([...cache.keys()], (k) => (nameIdx.has(k) ? nameIdx.get(k) : null), idx, cacheCap())) cache.delete(k);
   }
+  drawBufBar();
+}
+// decode instance i of the current series, keyed by its unique id (safe against
+// series switches - a stale completion just caches under its own id, never the
+// wrong slot)
+function decodeIntoCache(i) {
+  const inst = cur.instances[i], name = inst.name;
+  if (cache.has(name) || inflight.has(name)) return;
+  inflight.add(name);
+  decodeInstance(inst).then((f) => cachePut(name, f)).catch(() => {})
+    .finally(() => { inflight.delete(name); ensurePrefetch(); });
 }
 function ensurePrefetch() {
   if (!cur) return;
   const n = cur.instances.length;
-  // ahead in the scroll direction
   for (let k = 1; k <= prefetchN && inflight.size < CONCURRENCY; k++) {
-    const j = idx + k * lastDir;
-    if (j < 0 || j >= n || cache.has(j) || inflight.has(j)) continue;
-    inflight.add(j);
-    decodeInstance(cur.instances[j]).then((f) => cachePut(j, f)).catch(() => {})
-      .finally(() => { inflight.delete(j); ensurePrefetch(); });
+    const j = idx + k * lastDir; if (j >= 0 && j < n) decodeIntoCache(j);
   }
-  // one behind, for comfortable scroll-back
-  const b = idx - lastDir;
-  if (inflight.size < CONCURRENCY && b >= 0 && b < n && !cache.has(b) && !inflight.has(b)) {
-    inflight.add(b);
-    decodeInstance(cur.instances[b]).then((f) => cachePut(b, f)).catch(() => {})
-      .finally(() => { inflight.delete(b); });
-  }
+  const b = idx - lastDir; if (inflight.size < CONCURRENCY && b >= 0 && b < n) decodeIntoCache(b);
 }
 
 async function selectSeries(s) {
-  cur = s; idx = 0; cache.clear(); inflight.clear(); zoom = 1; panX = panY = 0; invert = false; needWL = true; lastDir = 1;
+  cur = s; idx = 0; inflight.clear(); seriesGen++; zoom = 1; panX = panY = 0; invert = false; needWL = true; lastDir = 1;
+  nameIdx = new Map(s.instances.map((it, i) => [it.name, i]));
   series.forEach((x) => x.el && x.el.classList.toggle('on', x === s));
   $('slice').max = s.instances.length - 1; $('slice').value = 0;
   await show(0);
@@ -499,38 +502,51 @@ async function show(i) {
   idx = target;
   measure = [];
   $('slice').value = idx; $('sliceLbl').textContent = `${idx + 1}/${cur.instances.length}`;
+  const name = cur.instances[idx].name, gen = seriesGen;
   try {
-    let fr = cache.get(idx);
+    let fr = cache.get(name);
     if (!fr) {
       if (source === 'remote') busy(`${T.buffering} ${idx + 1}/${cur.instances.length}...`, null);
-      fr = await decodeInstance(cur.instances[idx]); cachePut(idx, fr);
-      busy(null);
+      fr = await decodeInstance(cur.instances[idx]);
+      if (gen !== seriesGen) return;   // series changed while we awaited - discard, don't render the wrong frame
+      cachePut(name, fr); busy(null);
     }
     frame = fr;
     if (needWL) { wc = fr.wc0; ww = fr.ww0; needWL = false; }
     if (presetSel.value !== '0') { const p = CT_PRESETS[+presetSel.value]; wc = p.wc; ww = p.ww; }
     render();
-    ensurePrefetch(); // keep the buffer topped up ahead of you
+    ensurePrefetch();
   } catch (e) { stat(`cannot display: ${e.message}`); }
 }
-function wrapText(ctx, text, x, y, maxW, lh) {
-  const words = text.split(' '); let line = '';
-  for (const w of words) {
-    if (ctx.measureText(line + w + ' ').width > maxW && line) { ctx.fillText(line, x, y); line = ''; y += lh; }
-    line += w + ' ';
-  }
-  ctx.fillText(line, x, y);
+// buffered-span indicator under the slice slider (green where cached)
+function drawBufBar() {
+  const c = $('bufbar'); if (!c || !cur) return;
+  const n = cur.instances.length, w = c.clientWidth || 300, h = 4;
+  if (c.width !== w) c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#2e5c2e'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#5fd15f';
+  for (let i = 0; i < n; i++) if (cache.has(cur.instances[i].name)) g.fillRect((i / n) * w, 0, Math.max(1, w / n), h);
+  g.fillStyle = '#ffdf60'; const x = (idx / n) * w; g.fillRect(x - 1, 0, 2, h); // current position
+}
+// size the canvas backing store to device pixels (sharp on hi-DPI / retina and
+// after A-/A+ zoom), then work in CSS pixels via the DPR transform
+function fitCanvas() {
+  const dpr = (window.devicePixelRatio || 1) * ((document.body.style.zoom && parseFloat(document.body.style.zoom) / 100) || 1);
+  const w = vp.clientWidth, h = vp.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h };
 }
 function drawEmpty() {
-  const w = vp.clientWidth, h = vp.clientHeight;
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const { w, h } = fitCanvas();
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   $('emptyTxt').textContent = T.emptyHint;
   $('empty').style.display = 'flex';
 }
 function render() {
-  const w = vp.clientWidth, h = vp.clientHeight;
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const { w, h } = fitCanvas();
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
   if (!frame) { drawEmpty(); return; }
   $('empty').style.display = 'none';
@@ -558,6 +574,8 @@ function render() {
   $('ovTR').textContent = [p.institution, p.study, p.studyDate].filter(Boolean).join('\n');
   $('ovBL').textContent = `S${cur.num ?? '?'} ${cur.modality} ${cur.desc}\nimg ${idx + 1}/${cur.instances.length}  ${frame.cols}x${frame.rows}`;
   $('ovBR').textContent = frame.bitmap ? `zoom ${(zoom * 100).toFixed(0)}%` : `WL ${Math.round(wc)} / WW ${Math.round(ww)}\nzoom ${(zoom * 100).toFixed(0)}%`;
+  $('wlz').textContent = frame.bitmap ? `zoom ${(zoom * 100).toFixed(0)}%` : `WL ${Math.round(wc)} · WW ${Math.round(ww)} · zoom ${(zoom * 100).toFixed(0)}%`;
+  drawBufBar();
 }
 
 // thumbnails, lazily after scan
@@ -593,12 +611,9 @@ const DEMOS = {
   ct: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_ct_demo.zip', label: 'demo CT' },
   mri: { url: 'https://pub-8dce60257b734075811f134fea636cfb.r2.dev/scds_mri_demo.zip', label: 'demo MRI' },
 };
-$('demo').onchange = async () => {
-  const d = DEMOS[$('demo').value];
-  if (!d) return;
-  try { await openUrl(d.url, d.label); }
-  catch (e) { stat(`demo failed: ${e.message}`); }
-};
+async function loadDemo(key) { try { await openUrl(DEMOS[key].url, DEMOS[key].label); } catch (e) { stat(`demo failed: ${e.message}`); } }
+$('demoCtBtn').onclick = () => loadDemo('ct');
+$('demoMriBtn').onclick = () => loadDemo('mri');
 const TOOLS = [['tBrowse', 'browse'], ['tWL', 'wl'], ['tPan', 'pan'], ['tZoom', 'zoom'], ['tMeasure', 'measure']];
 for (const [id, t] of TOOLS) {
   $(id).onclick = () => { tool = t; for (const [id2, t2] of TOOLS) $(id2).classList.toggle('on', t2 === tool); };
@@ -624,6 +639,12 @@ $('bNext').onclick = () => show(idx + 1);
 $('slice').oninput = () => show(+$('slice').value);
 vp.addEventListener('wheel', (e) => { e.preventDefault(); show(idx + (e.deltaY > 0 ? 1 : -1)); }, { passive: false });
 window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {   // Ctrl +/- zooms the image (not the browser)
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); zoom = Math.min(12, zoom * 1.2); render(); }
+    else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoom = Math.max(0.2, zoom / 1.2); render(); }
+    else if (e.key === '0') { e.preventDefault(); zoom = 1; panX = panY = 0; render(); }
+    return;
+  }
   if (e.key === 'ArrowDown' || e.key === 'ArrowRight') show(idx + 1);
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') show(idx - 1);
 });

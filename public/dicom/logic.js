@@ -120,6 +120,21 @@ export function seriesFromDicomdirRecords(records, resolve) {
   return metas;
 }
 
+// which cache keys to evict to get under `cap`. The slice cache is keyed by each
+// image's UNIQUE file id (not by slice index) so a late prefetch from a previous
+// series can never overwrite the current series' slot. Eviction drops the keys
+// farthest from the current slice first (and other-series keys, index null,
+// first of all), but never the current slice.
+export function evictKeys(keys, indexOf, curIdx, cap) {
+  if (keys.length <= cap) return [];
+  const scored = keys.map((k) => {
+    const i = indexOf(k);
+    return { k, d: i == null ? Infinity : Math.abs(i - curIdx) };
+  });
+  scored.sort((a, b) => b.d - a.d); // farthest / other-series first
+  return scored.slice(0, keys.length - cap).filter((s) => s.d > 0).map((s) => s.k);
+}
+
 // map stored pixel values to 0..255 through rescale + window
 export function makeLut(slope, intercept, wc, ww, invert) {
   const w = Math.max(1, ww);

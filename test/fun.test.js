@@ -352,3 +352,33 @@ test('dicom: zip index + slice read over real HTTP Range (streaming)', async () 
     unlinkSync(tmp);
   }
 });
+
+import { evictKeys } from '../public/dicom/logic.js';
+test('dicom: cache eviction keeps current window, drops farthest/other-series', () => {
+  // keys are unique image ids; indexOf maps to position in CURRENT series (null = other series)
+  const cur = { A:0, B:1, C:2, D:3, E:4 };
+  const other = { X:null, Y:null };
+  const indexOf = (k) => (k in cur ? cur[k] : null);
+  // over cap by 2 at idx=2: farthest (A d=2, E d=2) should go before near ones; current (C) never
+  let ev = evictKeys(['A','B','C','D','E'], indexOf, 2, 3);
+  assert.equal(ev.length, 2);
+  assert.ok(!ev.includes('C'));                 // never evict the current slice
+  assert.deepEqual(ev.sort(), ['A','E']);       // the two farthest
+  // other-series keys (index null -> Infinity distance) are evicted first
+  const idxOf2 = (k) => (k in cur ? cur[k] : (k in other ? other[k] : null));
+  ev = evictKeys(['A','B','X','Y'], idxOf2, 1, 2);
+  assert.deepEqual(ev.sort(), ['X','Y']);       // both cross-series dropped, current-series A/B kept
+  assert.deepEqual(evictKeys(['A','B'], indexOf, 1, 5), []); // under cap: nothing
+});
+test('dicom: DICOMDIR-resolved instances have unique ids (safe cache key)', () => {
+  const records = [
+    { type: 'SERIES', seriesUID: 's1', seriesNum: 1, modality: 'CT' },
+    { type: 'IMAGE', fid: 'DICOM\\A', instance: 1 }, { type: 'IMAGE', fid: 'DICOM\\B', instance: 2 },
+    { type: 'SERIES', seriesUID: 's2', seriesNum: 2, modality: 'CT' },
+    { type: 'IMAGE', fid: 'DICOM\\C', instance: 1 },
+  ];
+  const items = new Map([['DICOM/A',{name:'DICOM/A'}],['DICOM/B',{name:'DICOM/B'}],['DICOM/C',{name:'DICOM/C'}]]);
+  const metas = seriesFromDicomdirRecords(records, makeResolver(items, 'DICOMDIR'));
+  const names = metas.map((m) => m.name);
+  assert.equal(new Set(names).size, names.length);  // all image ids unique across series -> no cross-series cache collision
+});
