@@ -10,7 +10,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- tab title stays constant on open; keep the version here in sync with APP_VERSION in the script -->
-<title>ClearEvo.com MRI/CT CD Viewer v1.3.0 - open or stream your DICOM scan CD in the browser, no upload</title>
+<title>ClearEvo.com MRI/CT CD Viewer v1.4.0 - open or stream your DICOM scan CD in the browser, no upload</title>
 <meta name="description" content="Free online MRI/CT CD viewer: open or stream the DICOM CD from your MRI or CT scan right in your browser, on PC and phone - series list, slice scrolling, window/level, measure, tags. 100% client-side, your medical images are never uploaded. A DICOM viewer with no install and no sign-up.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='13' fill='%230c2035'/><ellipse cx='32' cy='33' rx='18' ry='21' fill='%231c5680' stroke='%235bb6e6' stroke-width='3'/><g fill='none' stroke='%230a2338' stroke-width='2.4' stroke-linecap='round'><path d='M32 14 V27 M32 39 V52'/><path d='M26 19 C21 27, 22 39, 27 47'/><path d='M38 19 C43 27, 42 39, 37 47'/><path d='M22 26 C19 32, 20 40, 24 45'/><path d='M42 26 C45 32, 44 40, 40 45'/></g><g fill='%23cdefff'><path d='M30.6 31 C28 33, 27.4 36, 29 39 C30 36, 30 34, 30.6 32Z'/><path d='M33.4 31 C36 33, 36.6 36, 35 39 C34 36, 34 34, 33.4 32Z'/></g></svg>">
 <link rel="canonical" href="https://www.clearevo.com/dicom/">
@@ -62,6 +62,15 @@ button,select,input{font-family:inherit}
 .status-bar a{color:#4aa9e0}
 .demobtn{font:600 14px 'Segoe UI',Tahoma,sans-serif;color:#fff;background:linear-gradient(#1c86c8,#125a92);border:1px solid #2aa9e0;border-radius:7px;padding:11px 20px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .demobtn:hover{background:linear-gradient(#2a96d8,#1a6aa2)}
+#gesture{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;pointer-events:none;background:rgba(3,10,18,.38)}
+#gestIcon{font-size:54px;filter:drop-shadow(0 3px 8px #000)}
+#gestTxt{background:rgba(9,22,36,.94);border:1px solid #2f6a8f;color:#cfe8fb;font:13px Tahoma,sans-serif;padding:7px 14px;border-radius:8px;max-width:88%;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.55)}
+@keyframes gestV{0%,100%{transform:translateY(36px)}50%{transform:translateY(-36px)}}
+@keyframes gestH{0%,100%{transform:translateX(-44px)}50%{transform:translateX(44px)}}
+@keyframes gestCross{0%,100%{transform:translate(0,32px)}25%{transform:translate(0,-32px)}50%{transform:translate(-44px,0)}75%{transform:translate(44px,0)}}
+@keyframes gestTap{0%,24%,100%{transform:translate(-40px,16px) scale(1)}12%{transform:translate(-40px,16px) scale(.65)}50%,74%{transform:translate(40px,-16px) scale(1)}62%{transform:translate(40px,-16px) scale(.65)}}
+@keyframes blinkOpen{0%,100%{background:#0d3a5c;border-color:#2aa9e0;color:#8fd8ff;box-shadow:0 0 9px rgba(42,169,224,.75)}50%{background:transparent;border-color:transparent;color:#a7bccf;box-shadow:none}}
+.blinkOpen{animation:blinkOpen 1.1s ease-in-out infinite}
 .title-bar-controls{position:fixed;top:8px;right:12px;display:flex;align-items:center;z-index:999}
 .title-bar .fontbtn{width:24px;height:18px;font:bold 10px Tahoma,sans-serif;color:#cdd9e5;background:#183350;border:1px solid #2aa9e0;border-radius:4px;cursor:pointer;padding:0;margin-left:3px}
 @media (max-width:700px){#main{flex-direction:column}#serieslist{flex:0 0 92px;display:flex;overflow-x:auto;overflow-y:hidden;border-right:none;border-bottom:1px solid #1c3550}.ser{flex:0 0 150px}.tbtn .lbl{display:none}.tbtn{min-width:38px;padding:5px 7px}}
@@ -80,11 +89,13 @@ button,select,input{font-family:inherit}
     <button class="tbtn" id="tPan" ><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><path d="M12 3l-2.4 3M12 3l2.4 3M12 21l-2.4-3M12 21l2.4-3M3 12l3-2.4M3 12l3 2.4M21 12l-3-2.4M21 12l-3 2.4"/></svg><span class="lbl"></span></button>
     <button class="tbtn" id="tZoom" title="drag to zoom (Ctrl +/-; pinch on touch)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></svg><span class="lbl"></span></button>
     <button class="tbtn" id="tMeasure" title="click two points - length in mm"><svg viewBox="0 0 24 24"><path d="M3 15L15 3l6 6L9 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bMUndo" title="remove the last measure point"><svg viewBox="0 0 24 24"><path d="M8 4H3v5"/><path d="M3.5 4.5A10.5 10.5 0 0 1 13 11"/><path d="M9 17l8-8 4 4-8 8z"/><path d="M12 16l1.5 1.5M15 13l1.5 1.5"/></svg><span class="lbl"></span></button>
     <div class="tsep"></div>
     <button class="tbtn" id="bCine" title="play/stop cine loop"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
     <button class="tbtn" id="bInvert" title="invert black/white"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M6.34 6.34 A8 8 0 0 0 17.66 17.66 Z" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
     <button class="tbtn" id="bReset" title="reset zoom/pan/window"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4.5v4.5h4.5"/></svg><span class="lbl"></span></button>
-    <button class="tbtn" id="bCapture" title="save current image as PNG")><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bCapture" title="save current image as PNG"><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg><span class="lbl"></span></button>
+    <button class="tbtn" id="bCaptureAs" title="save current image as PNG with a file name you choose"><svg viewBox="0 0 24 24"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><text x="12" y="16" text-anchor="middle" font-size="7.5" font-family="Tahoma,sans-serif" font-weight="bold" fill="currentColor" stroke="none">ABC</text></svg><span class="lbl"></span></button>
     <button class="tbtn" id="bTags" title="all DICOM tags of the current image"><svg viewBox="0 0 24 24"><path d="M3 11l8-8h7v7l-8 8z"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/></svg><span class="lbl"></span></button>
     <div class="tsep"></div>
     <select id="preset" title="CT window presets"></select>
@@ -117,6 +128,7 @@ button,select,input{font-family:inherit}
           <button id="demoMriBtn" class="demobtn"></button>
         </div>
       </div>
+      <div id="gesture"><div id="gestIcon">👆</div><div id="gestTxt"></div></div>
       <div id="toast" style="position:absolute;left:50%;bottom:44px;transform:translateX(-50%);background:rgba(9,22,36,.94);border:1px solid #2f6a8f;color:#cfe8fb;font:13px Tahoma,sans-serif;padding:7px 14px;border-radius:8px;display:none;pointer-events:none;max-width:88%;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.55)"></div>
       <pre id="tags" style="position:absolute;inset:8px;background:rgba(255,255,255,.95);color:#000;overflow:auto;font:11px 'DejaVu Sans Mono',monospace;padding:8px;display:none;margin:0"></pre>
     </div>
@@ -161,7 +173,7 @@ import * as jpegLossless from './lossless-min.js';
 const $ = (id) => document.getElementById(id);
 // App identity - bump APP_VERSION here and in the <title> tag together.
 const APP_NAME = 'ClearEvo.com MRI/CT CD Viewer';
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const APP_TITLE = `${APP_NAME} v${APP_VERSION}`;
 $('titleText').textContent = APP_TITLE;
 $('aboutVer').textContent = `v${APP_VERSION}`;
@@ -170,24 +182,38 @@ const stat = (t) => { $('stat').textContent = t; };
 
 // ---- i18n (EN + natural Thai; Thai PACS keeps W/L, Zoom, Tags in English) ----
 const I18N = {
-  en: { open: 'Open file', folder: 'Open folder', cine: 'Cine', pause: 'Pause', capture: 'Save PNG',
-    loadingPreviews: 'Loading series previews…', ready: 'Ready', startReached: 'Start of series', endReached: 'End of series', frame: 'frame', frames: 'frames', demoSelect: '▶ Try a demo scan...',
-    demoCT: '▶ Try CT demo (left SCDS)', demoMRI: '▶ Try MRI demo',
-    browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: 'Measure', reset: 'Reset', invert: 'Invert', tags: 'Tags',
+  en: { open: 'Open file', folder: 'Open folder', cine: 'Cine', pause: 'Pause', capture: 'Save PNG', captureAs: 'PNG as…',
+    pngPrompt: 'File name for the PNG:', pngSaved: 'saved - check your Downloads folder', pngFail: 'could not save: ',
+    demoDl: 'Demo download started (check your Downloads). When it finishes, press the blinking "Open file" and pick the zip.',
+    loadingPreviews: 'Loading series previews…', ready: 'Ready', startReached: 'Start of series', endReached: 'End of series', frame: 'frame', frames: 'frames',
+    demoCT: '⬇ Download CT demo (1.2 GB)', demoMRI: '⬇ Download MRI demo (870 MB)',
+    browse: 'Browse', wl: 'W/L', pan: 'Pan', zoom: 'Zoom', measure: 'Measure', undoPt: 'Undo pt', reset: 'Reset', invert: 'Invert', tags: 'Tags',
+    gBrowse: 'Swipe / drag up-down to scroll slices (wheel and ◀ ▶ too)',
+    gWL: 'Drag left-right = window width, up-down = level',
+    gPan: 'Drag to move the image',
+    gZoom: 'Drag up = zoom in, down = zoom out (pinch or Ctrl +/- too)',
+    gMeasure: 'Tap two points - length in mm. Undo pt removes the last point',
     browseHint: 'drag / swipe to scroll through slices; pinch or Zoom tool to zoom; double-tap to zoom',
-    emptyHint: 'Open your CT/MRI scan CD (.zip or .tar) or its folder - images stay on your device, nothing is uploaded.',
+    emptyHint: 'Open your CT/MRI scan CD (.zip or .tar) or its folder - images stay on your device, nothing is uploaded. No scan file yet? Download a demo below, then press "Open file" and pick the zip.',
     sourceLocal: 'local', sourceOnDevice: 'on your device', sourceRemote: 'streaming - nothing downloaded whole',
     downloadFull: 'download the full CD (GPL)', fastest: 'For fastest scrolling,', andOpenLocally: 'and open it locally.',
     loadingIndex: 'Reading scan index', parsing: 'Parsing index...', connecting: 'Connecting...',
     readingArchive: 'Reading archive index...', buffering: 'Buffering slice', loadingSlice: 'Loading...',
     notDevice: 'not a medical device: for personal viewing, not diagnosis',
     privacy: '100% in-browser - your medical images are NEVER uploaded', langName: 'EN' },
-  th: { open: 'เปิดไฟล์', folder: 'เปิดโฟลเดอร์', cine: 'ซีเน', pause: 'พัก', capture: 'บันทึก PNG',
-    loadingPreviews: 'กำลังโหลดตัวอย่างซีรีส์…', ready: 'พร้อมแล้ว', startReached: 'ต้นซีรีส์แล้ว', endReached: 'ท้ายซีรีส์แล้ว', frame: 'ภาพ', frames: 'ภาพ', demoSelect: '▶ ลองดูสแกนตัวอย่าง...',
-    demoCT: '▶ ลองตัวอย่าง CT (SCDS)', demoMRI: '▶ ลองตัวอย่าง MRI',
-    browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: 'วัดระยะ', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
+  th: { open: 'เปิดไฟล์', folder: 'เปิดโฟลเดอร์', cine: 'ซีเน', pause: 'พัก', capture: 'บันทึก PNG', captureAs: 'PNG ตั้งชื่อ…',
+    pngPrompt: 'ตั้งชื่อไฟล์ PNG:', pngSaved: 'บันทึกแล้ว - ดูในโฟลเดอร์ดาวน์โหลด (Downloads)', pngFail: 'บันทึกไม่สำเร็จ: ',
+    demoDl: 'เริ่มดาวน์โหลดสแกนตัวอย่างแล้ว (ดูในโฟลเดอร์ดาวน์โหลด) พอเสร็จ กดปุ่ม "เปิดไฟล์" ที่กะพริบ แล้วเลือกไฟล์ zip',
+    loadingPreviews: 'กำลังโหลดตัวอย่างซีรีส์…', ready: 'พร้อมแล้ว', startReached: 'ต้นซีรีส์แล้ว', endReached: 'ท้ายซีรีส์แล้ว', frame: 'ภาพ', frames: 'ภาพ',
+    demoCT: '⬇ ดาวน์โหลดตัวอย่าง CT (1.2 GB)', demoMRI: '⬇ ดาวน์โหลดตัวอย่าง MRI (870 MB)',
+    browse: 'ดูภาพ', wl: 'W/L', pan: 'เลื่อนภาพ', zoom: 'Zoom', measure: 'วัดระยะ', undoPt: 'ลบจุด', reset: 'รีเซ็ต', invert: 'สลับขาว-ดำ', tags: 'Tags',
+    gBrowse: 'ปัด / ลากขึ้น-ลง เพื่อไล่ดู slice (ลูกกลิ้งเมาส์และ ◀ ▶ ก็ได้)',
+    gWL: 'ลากซ้าย-ขวา = ความกว้างหน้าต่าง, ขึ้น-ลง = ระดับ',
+    gPan: 'ลากเพื่อเลื่อนภาพ',
+    gZoom: 'ลากขึ้น = ซูมเข้า, ลง = ซูมออก (สองนิ้วหุบ-ถ่าง หรือ Ctrl +/- ก็ได้)',
+    gMeasure: 'แตะสองจุด = ระยะเป็น mm ปุ่มลบจุดจะลบจุดล่าสุด',
     browseHint: 'ลาก / ปัดเพื่อไล่ดู slice; ใช้สองนิ้วหุบ-ถ่าง หรือเครื่องมือ Zoom เพื่อซูม; แตะสองครั้งเพื่อซูม',
-    emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip หรือ .tar) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ',
+    emptyHint: 'เปิดแผ่น CD สแกน CT/MRI (.zip หรือ .tar) หรือโฟลเดอร์ของแผ่น - ภาพอยู่ในเครื่องคุณ ไม่มีการอัปโหลดใด ๆ ยังไม่มีไฟล์สแกน? ดาวน์โหลดตัวอย่างด้านล่าง เสร็จแล้วกด "เปิดไฟล์" แล้วเลือกไฟล์ zip',
     sourceLocal: 'local', sourceOnDevice: 'อยู่ในเครื่องคุณ', sourceRemote: 'สตรีม - ไม่ได้ดาวน์โหลดทั้งไฟล์',
     downloadFull: 'ดาวน์โหลดทั้งแผ่น (GPL)', fastest: 'ถ้าอยากให้ไล่ดูภาพลื่นที่สุด', andOpenLocally: 'แล้วเปิดจากในเครื่อง',
     loadingIndex: 'กำลังอ่านรายการภาพสแกน', parsing: 'กำลังแปลงรายการภาพ...', connecting: 'กำลังเชื่อมต่อ...',
@@ -203,8 +229,8 @@ function applyLang(code) {
   const lbl = (id, t) => { const el = $(id) && $(id).querySelector('.lbl'); if (el) el.textContent = t; };
   lbl('bZip', T.open); lbl('bDir', T.folder);
   $('demoCtBtn').textContent = T.demoCT; $('demoMriBtn').textContent = T.demoMRI;
-  lbl('tWL', T.wl); lbl('tBrowse', T.browse); lbl('tPan', T.pan); lbl('tZoom', T.zoom); lbl('tMeasure', T.measure);
-  lbl('bCine', T.cine); lbl('bInvert', T.invert); lbl('bReset', T.reset); lbl('bCapture', T.capture); lbl('bTags', T.tags);
+  lbl('tWL', T.wl); lbl('tBrowse', T.browse); lbl('tPan', T.pan); lbl('tZoom', T.zoom); lbl('tMeasure', T.measure); lbl('bMUndo', T.undoPt);
+  lbl('bCine', T.cine); lbl('bInvert', T.invert); lbl('bReset', T.reset); lbl('bCapture', T.capture); lbl('bCaptureAs', T.captureAs); lbl('bTags', T.tags);
   $('tBrowse').title = T.browseHint;
   $('sbPrivacy').textContent = T.privacy; $('sbNotDevice').textContent = T.notDevice;
   if (!frame && !series.length) drawEmpty();
@@ -230,6 +256,7 @@ function busy(txt, frac) {
 let remoteUrl = null;
 function setSource(kind, label, url) {
   source = kind; remoteUrl = url || null; curSourceLabel = label;
+  setOpenBlink(false);   // a scan is opening - stop nagging
   const b = $('srcbadge');
   b.style.display = 'block';
   if (kind === 'remote') {
@@ -702,7 +729,7 @@ async function pumpThumbs() {
   await Promise.all(Array.from({ length: DL_CONCURRENCY }, worker));
   if (gen !== thumbGen) return;
   setBrowseLock(false);
-  if (total) toast(T.ready);
+  if (total) { toast(T.ready); showGesture(tool); }   // teach the active (default) tool once the scan is browsable
   // retry previews that failed (e.g. a 5G<->wifi switch dropped their fetch), in parallel with backoff
   for (let attempt = 1; attempt <= 4 && failed.length; attempt++) {
     await new Promise((r) => setTimeout(r, 1500 * attempt));
@@ -730,17 +757,40 @@ document.addEventListener('dragover', (e) => e.preventDefault());
 document.addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files.length) openAny(e.dataTransfer.files); });
 $('bDir').onclick = () => { const i = document.createElement('input'); i.type = 'file'; i.webkitdirectory = true;
   i.onchange = async () => { if (i.files.length) { try { await openFiles(i.files); } catch (e) { stat(e.message); } } }; i.click(); };
+// demo scans: download the whole zip, then the user opens it locally - streaming
+// buffer pauses felt slow and put people off, and a 1.2 GB download on wifi/5G is
+// quick. openUrl (HTTP Range streaming) is kept for the #load=/#cap= dev hooks.
 const DEMOS = {
-  ct: { url: '/dicom-demo/scds_ct_demo.zip', label: 'demo CT' },
-  mri: { url: '/dicom-demo/scds_mri_demo.zip', label: 'demo MRI' },
+  ct: { url: '/dicom-demo/scds_ct_demo.zip' },
+  mri: { url: '/dicom-demo/scds_mri_demo.zip' },
 };
-async function loadDemo(key) { try { await openUrl(DEMOS[key].url, DEMOS[key].label); } catch (e) { stat(`demo failed: ${e.message}`); } }
-$('demoCtBtn').onclick = () => loadDemo('ct');
-$('demoMriBtn').onclick = () => loadDemo('mri');
-const TOOLS = [['tBrowse', 'browse'], ['tWL', 'wl'], ['tPan', 'pan'], ['tZoom', 'zoom'], ['tMeasure', 'measure']];
-for (const [id, t] of TOOLS) {
-  $(id).onclick = () => { tool = t; for (const [id2, t2] of TOOLS) $(id2).classList.toggle('on', t2 === tool); };
+function downloadDemo(key) {
+  const a = document.createElement('a');
+  a.href = DEMOS[key].url; a.download = ''; a.click();     // same-origin (worker proxies R2), so download works
+  toast(T.demoDl, true);
 }
+$('demoCtBtn').onclick = () => downloadDemo('ct');
+$('demoMriBtn').onclick = () => downloadDemo('mri');
+// blink the open buttons until a scan is opened - the one action the start page needs
+function setOpenBlink(on) { for (const id of ['bZip', 'bDir']) $(id).classList.toggle('blinkOpen', on); }
+setOpenBlink(true);
+const TOOLS = [['tBrowse', 'browse'], ['tWL', 'wl'], ['tPan', 'pan'], ['tZoom', 'zoom'], ['tMeasure', 'measure']];
+// animated gesture hint: a finger acting out the tool's drag over the viewport for a few seconds
+const GESTURES = { browse: ['gestV', () => T.gBrowse], wl: ['gestCross', () => T.gWL], pan: ['gestCross', () => T.gPan], zoom: ['gestV', () => T.gZoom], measure: ['gestTap', () => T.gMeasure] };
+let gestTimer = 0;
+function showGesture(t) {
+  const g = GESTURES[t]; if (!g) return;
+  $('gesture').style.display = 'flex';
+  $('gestIcon').style.animation = `${g[0]} 1.5s ease-in-out infinite`;
+  $('gestTxt').textContent = g[1]();
+  clearTimeout(gestTimer);
+  gestTimer = setTimeout(hideGesture, 3200);
+}
+function hideGesture() { $('gesture').style.display = 'none'; $('gestIcon').style.animation = ''; }
+for (const [id, t] of TOOLS) {
+  $(id).onclick = () => { tool = t; for (const [id2, t2] of TOOLS) $(id2).classList.toggle('on', t2 === tool); showGesture(t); };
+}
+$('bMUndo').onclick = () => { if (measure.length) { measure.pop(); render(); } };
 $('bTags').onclick = () => {
   const el = $('tags');
   if (el.style.display === 'block') { el.style.display = 'none'; return; }
@@ -756,15 +806,28 @@ $('bTags').onclick = () => {
   el.style.display = 'block';
 };
 $('bReset').onclick = () => { zoom = 1; panX = panY = 0; if (frame) { wc = frame.wc0; ww = frame.ww0; } presetSel.value = '0'; render(); };
-// snapshot: save the current windowed slice as a native-resolution PNG
-$('bCapture').onclick = () => {
-  if (!frame) return;
-  const off = frame.bitmap ?? paint(frame, wc, ww, invert);
-  const c = document.createElement('canvas'); c.width = frame.cols; c.height = frame.rows;
-  c.getContext('2d').drawImage(off, 0, 0);
+// snapshot: save the current windowed slice as a native-resolution PNG.
+// Toast the file name on success (on phones the save is otherwise silent).
+function defaultPngName() {
   const nm = ((bannerMeta && bannerMeta.patient) || 'image').replace(/[^\w-]+/g, '_');
-  const a = document.createElement('a'); a.href = c.toDataURL('image/png');
-  a.download = `${nm}_S${cur ? cur.num : 0}_${idx + 1}.png`; a.click();
+  return `${nm}_S${cur ? cur.num : 0}_${idx + 1}`;
+}
+function capturePng(name) {
+  try {
+    const off = frame.bitmap ?? paint(frame, wc, ww, invert);
+    const c = document.createElement('canvas'); c.width = frame.cols; c.height = frame.rows;
+    c.getContext('2d').drawImage(off, 0, 0);
+    const fn = `${String(name).replace(/\.png$/i, '').replace(/[^\w.-]+/g, '_') || 'image'}.png`;
+    const a = document.createElement('a'); a.href = c.toDataURL('image/png');
+    a.download = fn; a.click();
+    toast(`${fn} ${T.pngSaved}`);
+  } catch (e) { toast(T.pngFail + e.message); }
+}
+$('bCapture').onclick = () => { if (frame) capturePng(defaultPngName()); };
+$('bCaptureAs').onclick = () => {
+  if (!frame) return;
+  const name = prompt(T.pngPrompt, defaultPngName());
+  if (name != null && name.trim()) capturePng(name.trim());
 };
 // cine loop through the series - button toggles play <-> pause (icon + label)
 let cineTimer = 0;
@@ -813,6 +876,7 @@ vp.addEventListener('pointerdown', (e) => {
   // don't capture the pointer for overlay controls (demo buttons etc.) - capture
   // steals the pointerup and the button never gets its click.
   if (e.target.closest('button, select, a, input')) return;
+  hideGesture();   // user is doing the gesture - get the demo out of the way
   vp.setPointerCapture(e.pointerId); pts.set(e.pointerId, { x: e.clientX, y: e.clientY, moved: 0 });
   if (pts.size === 2) { const [a, b] = [...pts.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); }
   if (tool === 'measure' && frame && lastTf && pts.size === 1) {
